@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "name": "proportional_cardinal_claim_1",
+    "timestamp": "2026-02-18_01-06-14",
+    "agg_result_path": "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json",
+    "agg_prompt": "Compare the reviews for the different McDonald''s locations. Highlight the commonalities and differences between the restaurant locations.",
+    "schema": {
+      "fields": [
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": []
+    },
+    "claim": "Only a minority of McDonald's locations had multiple reports of incorrect orders."
+  },
+  "claim_compilation_result": {
+    "response": "Looking at this claim, I need to analyze it step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim \"Only a minority of McDonald's locations had multiple reports of incorrect orders\" can be broken down as:\n\n- **Domain**: McDonald's locations (grouped by `business_id`)\n- **Predicate for each location**: \"has multiple reports of incorrect orders\" - meaning at least 2 reviews mentioning incorrect orders\n- **Quantifier**: \"Only a minority\" - this means the proportion of locations satisfying the predicate is less than 50% (minority = less than half)\n\nFormally:\n- Let `L` be the set of all McDonald's locations\n- Let `incorrect_order(review)` = true if the review reports an incorrect order\n- Let `has_multiple_incorrect(location)` = count of reviews with incorrect orders \u2265 2\n- Claim: `|{l \u2208 L : has_multiple_incorrect(l)}| / |L| < 0.5`\n\nNo negation needs to be pushed inward here.\n\n## Step 2: Query Operators and Expressions\n\nTo verify this claim, I need to:\n\n1. **Map**: For each review, identify if it reports an incorrect order\n2. **Aggregate by location**: Count how many reviews per location report incorrect orders\n3. **Determine which locations have \"multiple\" (\u22652) reports**: This creates a boolean per location\n4. **Aggregate across all locations**: Compute the proportion of locations with multiple incorrect order reports\n5. **Check**: Verify that this proportion is less than 0.5 (minority)\n\nThe key insight is:\n- \"Multiple reports\" means \u2265 2 reviews mentioning incorrect orders for a location\n- \"Minority\" means < 50% of locations\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {text} reports an incorrect order (e.g., wrong items, missing items, order mistakes)\",\n            bool\n        ).alias(\"reports_incorrect_order\")\n    )\n    .aggregate(\n        [count_if(col(\"reports_incorrect_order\")).alias(\"incorrect_order_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [proportion(col(\"incorrect_order_count\") >= 2).alias(\"prop_with_multiple_incorrect\")]\n    )\n    .check(col(\"prop_with_multiple_incorrect\") < 0.5)\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {text} reports an incorrect order (e.g., wrong items, missing items, order mistakes)\",\n            bool\n        ).alias(\"reports_incorrect_order\")\n    )\n    .aggregate(\n        [count_if(col(\"reports_incorrect_order\")).alias(\"incorrect_order_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [proportion(col(\"incorrect_order_count\") >= 2).alias(\"prop_with_multiple_incorrect\")]\n    )\n    .check(col(\"prop_with_multiple_incorrect\") < 0.5)\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-5",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 6984,
+        "output_token_count": 588
+      }
+    ],
+    "latency": 11.43197949999012
+  }
+}
