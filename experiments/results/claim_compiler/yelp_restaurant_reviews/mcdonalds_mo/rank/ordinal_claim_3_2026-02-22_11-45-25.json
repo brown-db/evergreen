@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "name": "ordinal_claim_3",
+    "timestamp": "2026-02-22_11-45-25",
+    "agg_result_path": "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/rank_2026-02-20_20-01-21.json",
+    "agg_prompt": "Analyze the reviews for the the different McDonald''s locations and describe the top 3 locations in terms of their service.",
+    "schema": {
+      "fields": [
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": []
+    },
+    "claim": "The top-ranked McDonald's location in terms of service has the Business ID 9eYm5gwEOhBQdkg9ihV7EA."
+  },
+  "claim_compilation_result": {
+    "response": "\n\nI'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states that the McDonald's location with business_id \"9eYm5gwEOhBQdkg9ihV7EA\" has the highest (rank 1) service rating among all McDonald's locations.\n\nFormally:\n- Let `service_praise_prop(b)` = proportion of reviews for business `b` that praise the service\n- The claim asserts: `rank(service_praise_prop(\"9eYm5gwEOhBQdkg9ihV7EA\")) = 1` (i.e., this business has the highest proportion of service praise)\n\n## Step 2: Query Operators and Expressions\n\n1. **Filter**: First, filter to reviews that mention service, since we're evaluating locations \"in terms of their service.\"\n2. **Map**: For each review that mentions service, determine whether the review praises/speaks positively about the service.\n3. **Aggregate**: Group by `business_id` and compute the proportion of reviews that praise service.\n4. **with_rank**: Rank the business locations by their service praise proportion (descending).\n5. **Filter**: Select the specific business_id \"9eYm5gwEOhBQdkg9ihV7EA\".\n6. **Check**: Verify that its rank equals 1.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} praises or speaks positively about the service at the restaurant\",\n            bool\n        ).alias(\"praises_service\")\n    )\n    .aggregate(\n        [proportion(col(\"praises_service\")).alias(\"service_praise_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"service_praise_prop\"))\n    .filter(col(\"business_id\").eq(\"9eYm5gwEOhBQdkg9ihV7EA\"))\n    .check(col(\"rank\").eq(1))\n)\n```",
+    "query": "(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} praises or speaks positively about the service at the restaurant\",\n            bool\n        ).alias(\"praises_service\")\n    )\n    .aggregate(\n        [proportion(col(\"praises_service\")).alias(\"service_praise_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"service_praise_prop\"))\n    .filter(col(\"business_id\").eq(\"9eYm5gwEOhBQdkg9ihV7EA\"))\n    .check(col(\"rank\").eq(1))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7106,
+        "output_token_count": 511
+      }
+    ],
+    "latency": 11.255464916001074
+  }
+}

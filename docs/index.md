@@ -1,0 +1,1 @@
+Evergreen is a query engine for efficiently verifying claims form semantic aggregates.
