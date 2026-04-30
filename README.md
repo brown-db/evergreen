@@ -1,6 +1,6 @@
 # Evergreen: Efficient Claim Verification for Semantic Aggregates
 
-This repository contains the code and experiments for *Evergreen: Efficient Claim Verification for Semantic Aggregates*.
+This repository contains the code and experiments for [*Evergreen: Efficient Claim Verification for Semantic Aggregates*](https://arxiv.org/abs/2604.26180).
 
 ## Prerequisites
 
