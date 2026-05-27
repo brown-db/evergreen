@@ -15,7 +15,12 @@ class TestCortexLanguageModel:
         "language_models",
         [
             [DEFAULT_LANGUAGE_MODEL],
-            ["claude-opus-4-6", "claude-opus-4-5", "claude-sonnet-4-6", "gemini-3-pro"],
+            [
+                "claude-opus-4-6",
+                "claude-opus-4-5",
+                "claude-sonnet-4-6",
+                "gemini-3.1-pro",
+            ],
         ],
     )
     def test_prompt(self, language_models: list[str]):

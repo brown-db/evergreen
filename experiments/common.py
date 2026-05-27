@@ -15,7 +15,7 @@ EVALUATION_LANGUAGE_MODELS = (
     "snowflake-llama-3.3-70b",
 )
 
-ENSEMBLE_LANGUAGE_MODELS = ("claude-opus-4-6", "claude-opus-4-5", "gemini-3-pro")
+ENSEMBLE_LANGUAGE_MODELS = ("claude-opus-4-6", "claude-opus-4-5", "gemini-3.1-pro")
 
 MODEL_CONTEXT_WINDOW_TOKENS = {
     "claude-opus-4-6": 200_000,
