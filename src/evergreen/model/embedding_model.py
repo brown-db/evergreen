@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -12,7 +11,7 @@ from typing import cast
 
 from nltk.tokenize import sent_tokenize  # type: ignore
 from snowflake.snowpark import Session
-from snowflake.snowpark.functions import ai_embed
+from snowflake.snowpark.functions import ai_embed, col
 
 from evergreen.common.cache import Cache, FileCache
 
@@ -74,11 +73,30 @@ class EmbeddingModel(ABC):
     ) -> list[list[float]]:
         pass
 
-    def embed_with_sentences(self, text: str) -> tuple[list[float], list[list[float]]]:
-        doc_embedding = self.embed(text, EmbeddingType.DOCUMENT)
-        sentences = sent_tokenize(text)
-        sentence_embeddings = self.embed_batch(sentences, EmbeddingType.DOCUMENT)
-        return doc_embedding, sentence_embeddings
+    def embed_with_sentences_batch(
+        self, texts: list[str]
+    ) -> list[tuple[list[float], list[list[float]]]]:
+        if not texts:
+            return []
+
+        doc_embeddings = self.embed_batch(texts, EmbeddingType.DOCUMENT)
+
+        sentences_per_text = [sent_tokenize(text) for text in texts]
+        sentence_embeddings = self.embed_batch(
+            [sentence for sentences in sentences_per_text for sentence in sentences],
+            EmbeddingType.DOCUMENT,
+        )
+
+        results: list[tuple[list[float], list[list[float]]]] = []
+        offset = 0
+        for doc_embedding, sentences in zip(
+            doc_embeddings, sentences_per_text, strict=True
+        ):
+            next_offset = offset + len(sentences)
+            results.append((doc_embedding, sentence_embeddings[offset:next_offset]))
+            offset = next_offset
+
+        return results
 
     def _cache_key(self, text: str) -> str:
         key_data = json.dumps(
@@ -92,8 +110,6 @@ class EmbeddingModel(ABC):
 
 
 class CortexEmbeddingModel(EmbeddingModel):
-    _MAX_WORKERS = 64
-
     _PREFIX = {
         "snowflake-arctic-embed-l-v2.0": {
             EmbeddingType.QUERY: "query: ",
@@ -163,17 +179,19 @@ class CortexEmbeddingModel(EmbeddingModel):
                 uncached_texts.append((i, text))
 
         if uncached_texts:
-
-            def call_model(text: str) -> list[float]:
-                df = self._session.range(1).select(ai_embed(self._model_name, text))
-                return cast(list[float], df.collect()[0][0])
-
-            with ThreadPoolExecutor(
-                max_workers=min(self._MAX_WORKERS, len(uncached_texts))
-            ) as executor:
-                uncached_embeddings = list(
-                    executor.map(call_model, [text for _, text in uncached_texts])
+            rows = (
+                self._session.create_dataframe(  # type: ignore
+                    uncached_texts,
+                    schema=["INDEX", "TEXT"],
                 )
+                .select(
+                    col("INDEX"),
+                    ai_embed(self._model_name, col("TEXT")).alias("EMBEDDING"),
+                )
+                .order_by(col("INDEX"))
+                .collect()
+            )
+            uncached_embeddings = [cast(list[float], row["EMBEDDING"]) for row in rows]
 
             for (i, text), embedding in zip(
                 uncached_texts, uncached_embeddings, strict=True

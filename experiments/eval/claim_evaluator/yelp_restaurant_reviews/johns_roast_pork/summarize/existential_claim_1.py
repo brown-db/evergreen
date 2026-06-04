@@ -45,7 +45,7 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
         return (col("enjoys_chicken_salad"),)
 
     def hints(self) -> str:
-        return "'Some' suggests a threshold of at least one."
+        return ""
 
 
 if __name__ == "__main__":

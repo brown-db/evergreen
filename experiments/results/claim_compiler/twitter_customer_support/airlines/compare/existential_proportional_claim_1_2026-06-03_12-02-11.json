@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "name": "existential_proportional_claim_1",
+    "timestamp": "2026-06-03_12-02-11",
+    "agg_result_path": "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json",
+    "agg_prompt": "Compare the customer support dialogs for the different airline companies. Highlight the commonalities and differences between the companies and integrate counts and statistics in your analysis where relevant.",
+    "schema": {
+      "fields": [
+        {
+          "name": "company_id",
+          "dtype": "str",
+          "description": "The unique identifier of the airline company."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": []
+    },
+    "claim": "The customer satisfaction for some airlines was a mixed bag."
+  },
+  "claim_compilation_result": {
+    "response": "I need to verify the claim that \"The customer satisfaction for some airlines was a mixed bag.\"\n\n## Step 1: Logical Structure\n\nThe claim states that there exist some airlines where customer satisfaction is mixed - meaning they have both positive and negative customer experiences in their dialogs. This is an existential quantifier over airlines.\n\nFormally:\n\u2203 airline \u2208 Airlines: mixed_satisfaction(airline)\n\nWhere \"mixed satisfaction\" means the airline has a meaningful proportion of both positive and negative customer satisfaction indicators in their dialogs.\n\n## Step 2: Query Design\n\nTo verify this claim, I need to:\n1. Classify each dialog's customer satisfaction sentiment (positive, negative, mixed, neutral)\n2. Group by company and check if there are airlines with both positive and negative sentiments present in meaningful proportions\n3. Check if at least some airlines have this \"mixed bag\" pattern\n\nI'll classify each dialog's customer satisfaction outcome, then for each airline compute the proportion of positive and negative outcomes, and check if some airlines have both positive and negative proportions above a threshold (indicating a \"mixed bag\").\n\n## Step 3: Query\n\n```python\nclass Satisfaction(Enum):\n    POSITIVE = \"positive\"\n    NEGATIVE = \"negative\"\n    MIXED = \"mixed\"\n    NEUTRAL = \"neutral\"\n\n(\n    df.map(\n        prompt(\n            \"Based on the customer support {dialog}, identify the customer's satisfaction level: \"\n            \"positive (customer seems satisfied/happy with the resolution), \"\n            \"negative (customer seems dissatisfied/frustrated), \"\n            \"mixed (customer expresses both satisfaction and dissatisfaction), \"\n            \"or neutral (no clear satisfaction signal)\",\n            Satisfaction\n        ).alias(\"satisfaction\")\n    )\n    .aggregate(\n        [\n            proportion(col(\"satisfaction\").eq(Satisfaction.POSITIVE) | col(\"satisfaction\").eq(Satisfaction.MIXED)).alias(\"positive_or_mixed_prop\"),\n            proportion(col(\"satisfaction\").eq(Satisfaction.NEGATIVE) | col(\"satisfaction\").eq(Satisfaction.MIXED)).alias(\"negative_or_mixed_prop\")\n        ],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [bool_or((col(\"positive_or_mixed_prop\") >= 0.2) & (col(\"negative_or_mixed_prop\") >= 0.2)).alias(\"some_mixed_bag\")]\n    )\n    .check(col(\"some_mixed_bag\"))\n)\n```",
+    "query": "class Satisfaction(Enum):\n    POSITIVE = \"positive\"\n    NEGATIVE = \"negative\"\n    MIXED = \"mixed\"\n    NEUTRAL = \"neutral\"\n\n(\n    df.map(\n        prompt(\n            \"Based on the customer support {dialog}, identify the customer's satisfaction level: \"\n            \"positive (customer seems satisfied/happy with the resolution), \"\n            \"negative (customer seems dissatisfied/frustrated), \"\n            \"mixed (customer expresses both satisfaction and dissatisfaction), \"\n            \"or neutral (no clear satisfaction signal)\",\n            Satisfaction\n        ).alias(\"satisfaction\")\n    )\n    .aggregate(\n        [\n            proportion(col(\"satisfaction\").eq(Satisfaction.POSITIVE) | col(\"satisfaction\").eq(Satisfaction.MIXED)).alias(\"positive_or_mixed_prop\"),\n            proportion(col(\"satisfaction\").eq(Satisfaction.NEGATIVE) | col(\"satisfaction\").eq(Satisfaction.MIXED)).alias(\"negative_or_mixed_prop\")\n        ],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [bool_or((col(\"positive_or_mixed_prop\") >= 0.2) & (col(\"negative_or_mixed_prop\") >= 0.2)).alias(\"some_mixed_bag\")]\n    )\n    .check(col(\"some_mixed_bag\"))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 6900,
+        "output_token_count": 570,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 11.627661875012564
+  }
+}

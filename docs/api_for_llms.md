@@ -2,7 +2,6 @@ The below is documentation specifically for an LLM to consume.
 
 ::: evergreen.col
 ::: evergreen.lit
-::: evergreen.contains
 ::: evergreen.prompt
 ::: evergreen.count_if
 ::: evergreen.proportion
@@ -93,6 +92,22 @@ Check if excessive violence is a frequent complaint for multiple movies:
 ... )
 ```
 
+Check if 10% of reviews praise the movie's sound effects:
+
+```
+>>> (
+...     df.map(
+...         prompt(
+...             "Identify whether the {review} praises the movie's sound effects", bool
+...         ).alias("praises_sound_effects")
+...     )
+...     .aggregate(
+...         [proportion(col("praises_sound_effects")).alias("praises_sound_effects_prop")]
+...     )
+...     .check(col("praises_sound_effects_prop").eq(0.10))
+... )
+```
+
 Check if Bob Smith wrote the soundtrack for the movie:
 
 ```
@@ -112,7 +127,7 @@ Check if Bob Smith wrote the soundtrack for the movie:
 ... )
 ```
 
-Check if multiple movies received mixed reviews:
+Check if some movies received mixed reviews:
 
 ```
 >>> class Sentiment(Enum):
@@ -135,8 +150,8 @@ Check if multiple movies received mixed reviews:
 ...         ],
 ...         group_by=[col("movie_name")]
 ...     )
-...     .aggregate([count_if((col("positive_or_mixed_prop") >= 0.2) & (col("negative_or_mixed_prop") >= 0.2)).alias("mixed_count")])
-...     .check(col("mixed_count") >= 2)
+...     .aggregate([bool_or((col("positive_or_mixed_prop") >= 0.2) & (col("negative_or_mixed_prop") >= 0.2)).alias("some_mixed")])
+...     .check(col("some_mixed"))
 ... )
 ```
 
@@ -159,6 +174,25 @@ Check if Interstellar has the most highly rated soundtrack among all the movie r
 ...     .with_rank(col("praises_prop"))
 ...     .filter(col("movie_name").eq("Interstellar"))
 ...     .check(col("rank").eq(1))
+... )
+```
+
+Check if Coco has the second highest number of praises among all the movie reviews:
+
+```
+>>> (
+...     df.map(
+...         prompt(
+...             "Identify whether the {review} praises the movie", bool
+...         ).alias("praises_movie")
+...     )
+...     .aggregate(
+...         [count_if(col("praises_movie")).alias("praises_count")],
+...         group_by=[col("movie_name")]
+...     )
+...     .with_rank(col("praises_count"))
+...     .filter(col("movie_name").eq("Coco"))
+...     .check(col("rank").eq(2))
 ... )
 ```
 

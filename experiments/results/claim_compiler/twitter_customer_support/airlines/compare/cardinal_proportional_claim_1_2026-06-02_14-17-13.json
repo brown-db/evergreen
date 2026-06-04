@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "name": "cardinal_proportional_claim_1",
+    "timestamp": "2026-06-02_14-17-13",
+    "agg_result_path": "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json",
+    "agg_prompt": "Compare the customer support dialogs for the different airline companies. Highlight the commonalities and differences between the companies and integrate counts and statistics in your analysis where relevant.",
+    "schema": {
+      "fields": [
+        {
+          "name": "company_id",
+          "dtype": "str",
+          "description": "The unique identifier of the airline company."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": []
+    },
+    "claim": "There are 4 airline companies where over 10% of customer complaints are regarding flight delays."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states: \"There are 4 airline companies where over 10% of customer complaints are regarding flight delays.\"\n\nFormally:\n- Let C be the set of all airline companies\n- Let complaints(c) be the set of customer complaint dialogs for company c\n- Let about_delays(d) = True iff dialog d is a complaint about flight delays\n- The claim asserts: |{c \u2208 C : proportion(about_delays(d) for d in complaints(c)) > 0.10}| = 4\n\nKey components:\n1. First, we need to identify dialogs that are customer complaints\n2. Among those complaints, identify which are about flight delays\n3. Compute the proportion per company\n4. Count companies where that proportion exceeds 10%\n5. Check that count equals 4\n\n## Step 2: Query Operators and Expressions\n\n1. **Filter**: Select dialogs that are customer complaints (the claim specifically says \"customer complaints\")\n2. **Map**: Label each complaint as being about flight delays or not\n3. **Aggregate with group_by**: Compute the proportion of flight delay complaints per company\n4. **Aggregate**: Count companies where the proportion > 0.10\n5. **Check**: Verify the count equals 4\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.filter(\n        prompt(\"The {dialog} contains a customer complaint\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {dialog} contains a customer complaint regarding flight delays\",\n            bool\n        ).alias(\"about_flight_delays\")\n    )\n    .aggregate(\n        [proportion(col(\"about_flight_delays\")).alias(\"delay_complaint_prop\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [count_if(col(\"delay_complaint_prop\") > 0.10).alias(\"num_companies_with_delay_complaints\")]\n    )\n    .check(col(\"num_companies_with_delay_complaints\").eq(4))\n)\n```",
+    "query": "(\n    df.filter(\n        prompt(\"The {dialog} contains a customer complaint\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {dialog} contains a customer complaint regarding flight delays\",\n            bool\n        ).alias(\"about_flight_delays\")\n    )\n    .aggregate(\n        [proportion(col(\"about_flight_delays\")).alias(\"delay_complaint_prop\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [count_if(col(\"delay_complaint_prop\") > 0.10).alias(\"num_companies_with_delay_complaints\")]\n    )\n    .check(col(\"num_companies_with_delay_complaints\").eq(4))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 6913,
+        "output_token_count": 500,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 11.705606208008248
+  }
+}

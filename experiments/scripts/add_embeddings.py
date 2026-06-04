@@ -32,17 +32,19 @@ def main(
     )
     model = model_config.create_embedding_model(cache_dir=cache_dir)
 
-    with open(input_path) as in_f, open(output_path, "w") as out_f:
-        for line in tqdm(in_f, desc="Adding embeddings"):
-            obj = json.loads(line)
+    with open(input_path) as in_f:
+        objs = [json.loads(line) for line in in_f]
 
-            for field in fields:
-                doc_embedding, sentence_embeddings = model.embed_with_sentences(
-                    obj[field]
-                )
-                obj[field + EMBEDDING_FIELD_SUFFIX] = doc_embedding
-                obj[field + SENTENCE_EMBEDDINGS_FIELD_SUFFIX] = sentence_embeddings
+    for field in tqdm(fields, desc="Adding embeddings"):
+        results = model.embed_with_sentences_batch([obj[field] for obj in objs])
+        for obj, (doc_embedding, sentence_embeddings) in zip(
+            objs, results, strict=True
+        ):
+            obj[field + EMBEDDING_FIELD_SUFFIX] = doc_embedding
+            obj[field + SENTENCE_EMBEDDINGS_FIELD_SUFFIX] = sentence_embeddings
 
+    with open(output_path, "w") as out_f:
+        for obj in objs:
             out_f.write(json.dumps(obj) + "\n")
 
     if not output_dataset_path:

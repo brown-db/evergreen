@@ -68,19 +68,22 @@ def add_embeddings(
     )
     model = model_config.create_embedding_model(cache_dir=None)
 
-    new_rows: list[Row] = []
+    text_index = schema.index_of(text_column_name)
+    embeddings = model.embed_with_sentences_batch(
+        [str(row[text_index]) for row in rows]
+    )
 
-    for row in rows:
-        text = str(row[schema.index_of(text_column_name)])
-        doc_embedding, sentence_embeddings = model.embed_with_sentences(text)
-        new_rows.append(
-            row.with_values(
-                (
-                    AnnotatedValue(doc_embedding, None),
-                    AnnotatedValue(sentence_embeddings, None),
-                )
+    new_rows = [
+        row.with_values(
+            (
+                AnnotatedValue(doc_embedding, None),
+                AnnotatedValue(sentence_embeddings, None),
             )
         )
+        for row, (doc_embedding, sentence_embeddings) in zip(
+            rows, embeddings, strict=True
+        )
+    ]
 
     new_schema = schema.with_fields(
         (

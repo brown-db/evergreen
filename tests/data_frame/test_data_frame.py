@@ -10,7 +10,6 @@ from evergreen.planner.logical.expr import (
     bool_and,
     bool_or,
     col,
-    contains,
     count_if,
     proportion,
 )
@@ -410,37 +409,6 @@ def test_check_with_compound_predicate(default_ctx: SessionContext):
         .collect()
     )
     assert result.rows == [Row((Row.AGG_ROW_ID, True))]
-
-
-def test_contains_case_sensitive(default_ctx: SessionContext):
-    schema = Schema((Field("id", int), Field("text", str)), ("id",))
-    rows = [
-        Row((1, "Hello World")),
-        Row((2, "hello world")),
-        Row((3, "Goodbye")),
-    ]
-
-    df = default_ctx.read_rows(rows, schema)
-    result = df.filter(contains(col("text"), "Hello")).collect()
-
-    assert result.rows == [Row((1, "Hello World"))]
-
-
-def test_contains_case_insensitive(default_ctx: SessionContext):
-    schema = Schema((Field("id", int), Field("text", str)), ("id",))
-    rows = [
-        Row((1, "Hello World")),
-        Row((2, "hello world")),
-        Row((3, "Goodbye")),
-    ]
-
-    df = default_ctx.read_rows(rows, schema)
-    result = df.filter(contains(col("text"), "hello", case_sensitive=False)).collect()
-
-    assert result.rows == [
-        Row((1, "Hello World")),
-        Row((2, "hello world")),
-    ]
 
 
 def test_log(

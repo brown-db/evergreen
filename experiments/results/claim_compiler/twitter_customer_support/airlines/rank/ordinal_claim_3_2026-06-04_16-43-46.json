@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "name": "ordinal_claim_3",
+    "timestamp": "2026-06-04_16-43-46",
+    "agg_result_path": "experiments/results/semantic_aggregate/twitter_customer_support/airlines/rank_2026-06-03_18-22-36.json",
+    "agg_prompt": "Analyze the customer support dialogs for the different airline companies and describe the worst 3 airline companies regarding flight booking issues.",
+    "schema": {
+      "fields": [
+        {
+          "name": "company_id",
+          "dtype": "str",
+          "description": "The unique identifier of the airline company."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": []
+    },
+    "claim": "SouthwestAir has the most customer support dialogs with complaints about flight booking issues."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states: \"SouthwestAir has the most customer support dialogs with complaints about flight booking issues.\"\n\nFormally:\n- Let `has_booking_complaint(d)` = dialog `d` contains a complaint about flight booking issues\n- Let `count(c)` = number of dialogs with booking complaints for company `c`\n- The claim asserts: `\u2200c (c \u2260 \"SouthwestAir\" \u2192 count(\"SouthwestAir\") \u2265 count(c))`\n\nThis means SouthwestAir should be ranked #1 when companies are ranked by the count of dialogs with flight booking complaints.\n\n## Step 2: Query Operators and Expressions\n\n1. First, I need to identify dialogs that contain complaints about flight booking issues using `filter()` or `map()` with a prompt.\n2. Then, I need to count such dialogs per company using `aggregate()` with `count_if()` and `group_by`.\n3. Then, rank companies by their count using `with_rank()`.\n4. Finally, filter for SouthwestAir and check if its rank is 1.\n\nI'll use:\n- `map()` with a prompt to identify dialogs with flight booking complaints\n- `aggregate()` with `count_if()` grouped by `company_id` to count complaints per company\n- `with_rank()` to rank companies by complaint count (descending, so highest count = rank 1)\n- `filter()` to select SouthwestAir\n- `check()` to verify rank equals 1\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {dialog} contains a complaint about flight booking issues\", bool\n        ).alias(\"has_booking_complaint\")\n    )\n    .aggregate(\n        [count_if(col(\"has_booking_complaint\")).alias(\"booking_complaint_count\")],\n        group_by=[col(\"company_id\")]\n    )\n    .with_rank(col(\"booking_complaint_count\"))\n    .filter(col(\"company_id\").eq(\"SouthwestAir\"))\n    .check(col(\"rank\").eq(1))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {dialog} contains a complaint about flight booking issues\", bool\n        ).alias(\"has_booking_complaint\")\n    )\n    .aggregate(\n        [count_if(col(\"has_booking_complaint\")).alias(\"booking_complaint_count\")],\n        group_by=[col(\"company_id\")]\n    )\n    .with_rank(col(\"booking_complaint_count\"))\n    .filter(col(\"company_id\").eq(\"SouthwestAir\"))\n    .check(col(\"rank\").eq(1))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7068,
+        "output_token_count": 538,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.989508125028806
+  }
+}
