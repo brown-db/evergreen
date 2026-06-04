@@ -16,7 +16,7 @@ This repository contains the code and experiments for [*Evergreen: Efficient Cla
 Install dependencies:
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh
-uv sync --all-groups
+uv sync
 ```
 
 Configure [Snowflake connection](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect#connecting-using-the-connections-toml-file) by creating `~/.snowflake/connections.toml`:
