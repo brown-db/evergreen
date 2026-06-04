@@ -1,4 +1,3 @@
-import functools
 import json
 import shutil
 from enum import Enum, auto
@@ -13,7 +12,6 @@ import seaborn as sns
 from experiments.common import MODEL_PRICING
 
 RESULTS_DIR = Path("experiments/results/claim_evaluator")
-COMPILER_DIR = Path("experiments/results/claim_compiler")
 FIGURES_DIR = Path("experiments/figures")
 PAPER_DIR = Path("paper")
 PAPER_FIGURES_DIR = PAPER_DIR / "figures"
@@ -157,25 +155,6 @@ def compute_token_costs(
     return input_token_cost, output_token_cost
 
 
-@functools.cache
-def compute_compile_metrics(
-    source: str, dataset: str, task: str, name: str
-) -> tuple[float, float, float]:
-    compiler_subdir = COMPILER_DIR / source / dataset / task
-    matches = list(compiler_subdir.glob(f"{name}_*.json"))
-
-    assert len(matches) == 1
-
-    with open(matches[0]) as file:
-        data = json.load(file)
-
-    compile_result = data["claim_compilation_result"]
-    compile_lm_metrics = compile_result["language_model_metrics"]
-    compile_model = compile_lm_metrics[0]["model_name"]
-    input_cost, output_cost = compute_token_costs(compile_model, compile_lm_metrics)
-    return input_cost, output_cost, compile_result["latency"]
-
-
 def get_impl_models(
     df: pd.DataFrame,
     impls: list[str] | None = None,
@@ -205,15 +184,7 @@ def load_results() -> pd.DataFrame:
         if "evaluation_result" not in data:
             continue
 
-        # Parse path: .../claim_evaluator/{source}/{dataset}/{task}/{claim}/
-        path_parts = file_path.relative_to(RESULTS_DIR).parts
-
         metadata = data["metadata"]
-
-        claim = f"{path_parts[1]}\n{path_parts[2]}\n{metadata['name']}"
-        if claim not in CLAIM_TO_CLAIM_ID:
-            continue
-
         evaluation_result = data["evaluation_result"]
         query_metrics = evaluation_result["query_metrics"]
 
@@ -229,27 +200,8 @@ def load_results() -> pd.DataFrame:
             "claude-opus-4-6", opt_lm_metrics
         )
 
-        impl = metadata["implementation"]
-
-        if impl.startswith("evg"):
-            compile_input_token_cost, compile_output_token_cost, compile_latency = (
-                compute_compile_metrics(
-                    path_parts[0], path_parts[1], path_parts[2], metadata["name"]
-                )
-            )
-        else:
-            compile_input_token_cost, compile_output_token_cost, compile_latency = (
-                0.0,
-                0.0,
-                0.0,
-            )
-
-        input_token_cost = (
-            exec_input_token_cost + opt_input_token_cost + compile_input_token_cost
-        )
-        output_token_cost = (
-            exec_output_token_cost + opt_output_token_cost + compile_output_token_cost
-        )
+        input_token_cost = exec_input_token_cost + opt_input_token_cost
+        output_token_cost = exec_output_token_cost + opt_output_token_cost
         total_token_cost = input_token_cost + output_token_cost
 
         lm_metrics = exec_lm_metrics + opt_lm_metrics
@@ -260,14 +212,15 @@ def load_results() -> pd.DataFrame:
         input_token_count = sum(m["input_token_count"] for m in lm_metrics)
         output_token_count = sum(m["output_token_count"] for m in lm_metrics)
 
-        latency = (
-            query_metrics["planning_latency"]
-            + query_metrics["execution_latency"]
-            + compile_latency
-        )
+        latency = query_metrics["planning_latency"] + query_metrics["execution_latency"]
+
+        # Parse path: .../claim_evaluator/{source}/{dataset}/{task}/{claim}/
+        path_parts = file_path.relative_to(RESULTS_DIR).parts
+
+        impl = metadata["implementation"]
 
         row = {
-            "claim": claim,
+            "claim": f"{path_parts[1]}\n{path_parts[2]}\n{metadata['name']}",
             "implementation": impl,
             "model": model_name,
             "trial_id": metadata["trial_id"],
