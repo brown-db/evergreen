@@ -23,7 +23,7 @@ from evergreen.planner.logical.plan import Filter
 from evergreen.provenance import Monomial
 from evergreen.storage.row import Row
 from evergreen.storage.row_id import RowId
-from experiments.baselines import rag_agent, reasoning_model
+from experiments.baselines import rag_agent, reasoning_model, rlm
 from experiments.common import (
     CONNECTION_NAME,
     EMBEDDING_MODEL,
@@ -43,6 +43,7 @@ class Implementation(Enum):
     # Baseline implementations
     BASE_RM = "base_rm"  # Reasoning model
     RAG_AGENT = "rag_agent"  # RAG agent
+    RLM = "rlm"  # RLM
 
     # Evergreen-based implementations
     EVG_REF = "evg_ref"  # Reference
@@ -243,6 +244,11 @@ class ClaimEvaluator(ABC):
                 for trial_id in range(trial_count):
                     self.evaluate_rag_agent(language_model, trial_id)
 
+        if Implementation.RLM in impls:
+            for language_model in language_models:
+                for trial_id in range(trial_count):
+                    self.evaluate_rlm(language_model, trial_id)
+
         if Implementation.EVG_REF in impls:
             self.evaluate_reference_query(trial_id=0)
 
@@ -312,6 +318,32 @@ class ClaimEvaluator(ABC):
         )
 
         logger.debug("RAG model evaluation completed")
+
+    def evaluate_rlm(self, language_model: str, trial_id: int) -> None:
+        setup_logging(
+            self._log_file_path(Implementation.RLM, (language_model,), trial_id)
+        )
+
+        logger.debug("Evaluating RLM")
+
+        evaluation_result = rlm.evaluate_claim(
+            self._claim,
+            self.hints(),
+            self._dataset_path,
+            self._dataset_key,
+            self._text_field_name,
+            self._schema_field_names,
+            language_model,
+        )
+
+        self._write_evaluation_result(
+            evaluation_result,
+            Implementation.RLM,
+            (language_model,),
+            trial_id,
+        )
+
+        logger.debug("RLM evaluation completed")
 
     def evaluate_reference_query(self, trial_id: int) -> None:
         setup_logging(

@@ -63,7 +63,6 @@ class RetrievalEngine:
         doc_embeddings: list[list[float]] = []
 
         self._docs: list[str] = []
-        self._row_strs: list[str] = []
         self._rows: list[dict[str, object]] = []
 
         for row in df.collect().rows:
@@ -72,7 +71,6 @@ class RetrievalEngine:
                 name: row[field_indices[name]] for name in self._schema_field_names
             }
             self._docs.append(str(row[text_field_index]))
-            self._row_strs.append(json.dumps(filtered_obj))
             self._rows.append(filtered_obj)
 
         self._doc_embeddings = np.array(doc_embeddings)
@@ -81,7 +79,7 @@ class RetrievalEngine:
 
     @property
     def row_count(self) -> int:
-        return len(self._row_strs)
+        return len(self._rows)
 
     @property
     def schema_fields(self) -> tuple[SchemaField, ...]:
@@ -98,7 +96,32 @@ class RetrievalEngine:
         exclusion_keywords: list[str],
         filters: dict[str, object],
         k: int,
-    ) -> list[str]:
+    ) -> list[dict[str, object]]:
+        """Search the dataset and return the top-k most relevant rows, ranked by
+        semantic similarity (query_text) and keyword matching
+        (inclusion/exclusion_keywords) using Reciprocal Rank Fusion.
+
+        Args:
+            query_text: Semantic search query used to find relevant rows via embedding
+                similarity. Choose a query that captures the meaning of the evidence
+                you need.
+            inclusion_keywords: Keywords/phrases that boost ranking of rows
+                containing them (soft signal, not a hard filter). Matched as
+                case-insensitive substrings, so prefer shorter, atomic terms.
+                Include common variations and abbreviations.
+            exclusion_keywords: Keywords/phrases that penalize ranking of rows
+                containing them (soft signal, not a hard filter). Matched as
+                case-insensitive substrings, so prefer shorter, atomic terms.
+            filters: Hard equality filters on non-text fields. Only rows matching all
+                filters are returned. E.g., filters={"id": "123"}.
+            k: Number of rows to retrieve. Can be up to the total row count for
+                exhaustive search.
+
+        Returns:
+            A list of up to k rows, each a dict of field name to value, ordered from
+            most to least relevant.
+        """
+
         filters = {k: v for k, v in filters.items() if v is not None}
 
         if filters:
@@ -125,7 +148,7 @@ class RetrievalEngine:
             exclusion_keywords,
         )
 
-        return [self._row_strs[candidate_indices[i]] for i in sorted_indices[:k]]
+        return [self._rows[candidate_indices[i]] for i in sorted_indices[:k]]
 
 
 class RetrieveParams(BaseModel):
@@ -244,11 +267,16 @@ def _build_tools(
     ]
 
 
-def _format_page(rows: list[str], cursor: int, page_size: int) -> tuple[str, int]:
+def _format_page(
+    rows: list[dict[str, object]], cursor: int, page_size: int
+) -> tuple[str, int]:
     page = rows[cursor : cursor + page_size]
     new_cursor = cursor + len(page)
     remaining = len(rows) - new_cursor
-    text = "\n".join(page) + f"\n[ROWS_SHOWN={len(page)} ROWS_REMAINING={remaining}]"
+    text = (
+        "\n".join(json.dumps(row) for row in page)
+        + f"\n[ROWS_SHOWN={len(page)} ROWS_REMAINING={remaining}]"
+    )
     logger.debug("tool_result:\n%s", text)
     return text, new_cursor
 
@@ -376,7 +404,7 @@ def evaluate_claim(
     )
 
     outputs: list[dict[str, object]] = []
-    retrieved_rows: list[str] = []
+    retrieved_rows: list[dict[str, object]] = []
     cursor = 0
     step = 0
     total_input_tokens = 0
