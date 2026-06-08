@@ -131,29 +131,31 @@ def evaluate_claim(
     root_prompt_count, root_input_tokens, root_output_tokens = _get_usage(root_lm)
     sub_prompt_count, sub_input_tokens, sub_output_tokens = _get_usage(sub_lm)
 
-    lm_metrics = [
-        LanguageModelMetrics(
-            model_name=DEFAULT_LANGUAGE_MODEL,
-            prompt_count=root_prompt_count,
-            input_token_count=root_input_tokens,
-            output_token_count=root_output_tokens,
-        ),
+    lm_metrics = (
         LanguageModelMetrics(
             model_name=language_model,
             prompt_count=sub_prompt_count,
             input_token_count=sub_input_tokens,
             output_token_count=sub_output_tokens,
         ),
-    ]
+    )
+    optimizer_lm_metrics = (
+        LanguageModelMetrics(
+            model_name=DEFAULT_LANGUAGE_MODEL,
+            prompt_count=root_prompt_count,
+            input_token_count=root_input_tokens,
+            output_token_count=root_output_tokens,
+        ),
+    )
 
     return EvaluationResult(
         verification_result=verification_result,
         query_metrics=QueryMetrics(
             planning_latency=0.0,
             execution_latency=execution_latency,
-            language_model_metrics=tuple(lm_metrics),
+            language_model_metrics=lm_metrics,
             embedding_model_metrics=embedding_model.metrics(),
-            optimizer_language_model_metrics=(),
+            optimizer_language_model_metrics=optimizer_lm_metrics,
         ),
         filter_metrics=None,
         map_metrics=None,
