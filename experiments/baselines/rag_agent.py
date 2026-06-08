@@ -304,7 +304,7 @@ def _add_cache_control(messages: list[MessageParam]) -> list[MessageParam]:
 
 
 _SYSTEM_PROMPT_TEMPLATE = """\
-You are a fact-checking agent. Your goal is to determine whether a claim is \
+You are a fact-checking agent. Your goal is to determine whether a claim is
 grounded in a dataset, i.e., fully supported by evidence in the dataset.
 A claim is NOT grounded if the dataset contradicts it or lacks sufficient evidence.
 
@@ -315,16 +315,16 @@ A claim is NOT grounded if the dataset contradicts it or lacks sufficient eviden
 
 ## Reasoning strategy
 At each step, think carefully about:
-1. **Claim formulation** — formally express the logical structure of the claim. \
-Leverage your knowledge of first-order logic and its extensions. Identify \
-constants, variables, predicates, functions, quantifiers, etc. If hints are \
+1. **Claim formulation** — formally express the logical structure of the claim.
+Leverage your knowledge of first-order logic and its extensions. Identify
+constants, variables, predicates, functions, quantifiers, etc. If hints are
 provided, use them for clarification on vague quantifier thresholds.
 2. **Progress review** — summarize what you have searched for and found so far.
 3. **Gap analysis** — identify what evidence is still missing.
 4. **Next action** — decide whether to retrieve, continue_reading, or respond.
 
-You are encouraged to set k to a large value (even to the total row count) for \
-exhaustive search and then paginate with continue_reading in order to gather \
+You are encouraged to set k to a large value (even to the total row count) for
+exhaustive search and then paginate with continue_reading in order to gather
 necessary evidence. Do not stop until you are absolutely confident in your verdict."""
 
 
