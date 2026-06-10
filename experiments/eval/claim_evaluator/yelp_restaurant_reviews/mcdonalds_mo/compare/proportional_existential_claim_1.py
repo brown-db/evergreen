@@ -8,10 +8,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -46,24 +47,21 @@ class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
             .check(col("prop_locations_with_cold_food") > 0.5)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("prop_locations_with_cold_food") > 0.5
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("mentions_cold_food"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ProportionalExistentialClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/mcdonalds_mo/compare/proportional_existential_claim_1_2026-02-16_23-41-52.json"
-        ),
-        dataset_key=("review_id",),
+        name="proportional_existential_claim_1",
+        claim="The majority of McDonald's locations had reports of cold food.",
+        hints="",
+        schema=REVIEW_WITH_BUSINESS_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

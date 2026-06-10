@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from evergreen.catalog.schema import Schema
+from evergreen.claim_compiler import ClaimCompiler
 from evergreen.common.constants import (
     JSON_INDENT,
     SENTENCE_EMBEDDINGS_FIELD_SUFFIX,
@@ -25,7 +26,9 @@ from evergreen.storage.row import Row
 from evergreen.storage.row_id import RowId
 from experiments.baselines import rag_agent, reasoning_model, rlm
 from experiments.common import (
+    CHECKPOINTS_DIR,
     CONNECTION_NAME,
+    DEFAULT_LANGUAGE_MODEL,
     EMBEDDING_MODEL,
     ENSEMBLE_LANGUAGE_MODELS,
     EVALUATION_LANGUAGE_MODELS,
@@ -47,8 +50,10 @@ class Implementation(Enum):
 
     # Evergreen-based implementations
     EVG_REF = "evg_ref"  # Reference
-    EVG_OPT = "evg_opt"  # Optimized
-    EVG_UNOPT = "evg_unopt"  # Unoptimized
+    EVG_OPT = "evg_opt"  # Optimized with compiled query
+    EVG_UNOPT = "evg_unopt"  # Unoptimized with compiled query
+    EVG_OPT_REF_QUERY = "evg_opt_ref_query"  # Optimized with reference query
+    EVG_UNOPT_REF_QUERY = "evg_unopt_ref_query"  # Unoptimized with reference query
 
     # Evergreen ablations
     EVG_ABL_NO_ES = "evg_abl_no_es"  # Early stopping
@@ -103,6 +108,7 @@ def parse_claim_evaluator_args() -> argparse.Namespace:
         default=[],
     )
     parser.add_argument("--eval_sim_filter", action="store_true")
+    parser.add_argument("--compile", action="store_true")
     parser.add_argument("--trial_count", type=int, default=3)
     return parser.parse_args()
 
@@ -110,24 +116,19 @@ def parse_claim_evaluator_args() -> argparse.Namespace:
 class ClaimEvaluator(ABC):
     def __init__(
         self,
-        claim_compilation_result_path: Path,
-        dataset_key: tuple[str, ...],
+        name: str,
+        claim: str,
+        hints: str,
+        schema: Schema,
         text_field_name: str,
+        agg_result_path: Path,
         random_seed: int,
         cache_id: str | None = None,
     ) -> None:
-        with open(claim_compilation_result_path) as f:
-            claim_compilation_result = json.load(f)
-
-        claim_metadata = claim_compilation_result["metadata"]
-
-        self._name = claim_metadata["name"]
-        self._claim = claim_metadata["claim"]
-        self._schema_field_names = {
-            field["name"] for field in claim_metadata["schema"]["fields"]
-        }
-
-        agg_result_path = Path(claim_metadata["agg_result_path"])
+        self._name = name
+        self._claim = claim
+        self._hints = hints
+        self._schema = schema
 
         with open(agg_result_path) as f:
             agg_result = json.load(f)
@@ -137,7 +138,6 @@ class ClaimEvaluator(ABC):
         self._dataset_path = agg_metadata["dataset_path"]
         self._agg_prompt = agg_metadata["prompt"]
 
-        self._dataset_key = dataset_key
         self._text_field_name = text_field_name
         self._random_seed = random_seed
         self._cache_id = cache_id
@@ -154,8 +154,9 @@ class ClaimEvaluator(ABC):
         )
         self._logs_dir = LOGS_DIR / claim_subdir
         self._results_dir = RESULTS_DIR / claim_subdir
+        self._checkpoints_dir = CHECKPOINTS_DIR / claim_subdir
 
-        for d in (self._logs_dir, self._results_dir):
+        for d in (self._logs_dir, self._results_dir, self._checkpoints_dir):
             d.mkdir(parents=True, exist_ok=True)
 
         self._timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
@@ -168,7 +169,7 @@ class ClaimEvaluator(ABC):
         )
 
     @abstractmethod
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -179,14 +180,6 @@ class ClaimEvaluator(ABC):
 
     @abstractmethod
     def semantic_map_columns(self) -> tuple[Expr, ...]:
-        pass
-
-    @abstractmethod
-    def check_predicate(self) -> Expr:
-        pass
-
-    @abstractmethod
-    def hints(self) -> str:
         pass
 
     def filter_prompt_str(self) -> str | None:
@@ -211,7 +204,7 @@ class ClaimEvaluator(ABC):
         trial_id: int,
     ) -> Path:
         return (
-            self._logs_dir / f"{checkpoint_type.value}_{impl.value}"
+            self._checkpoints_dir / f"{checkpoint_type.value}_{impl.value}"
             f"_{'_'.join(language_models)}_{trial_id}.pkl"
         )
 
@@ -229,7 +222,18 @@ class ClaimEvaluator(ABC):
     def _read_pickle(self, path: Path) -> DataFrame:
         return SessionContext().read_pickle(str(path))
 
+    def _compiled_query_path(self, trial_id: int) -> Path:
+        return self._results_dir / f"compiled_query_{trial_id}.json"
+
+    def _load_compiled_query(self, trial_id: int) -> str:
+        with open(self._compiled_query_path(trial_id)) as f:
+            return json.load(f)["claim_compilation_result"]["query"]
+
     def evaluate(self, args: argparse.Namespace) -> None:
+        if args.compile:
+            self.compile_claim_to_query(args.trial_count)
+            return
+
         impls = {Implementation(i) for i in args.impls}
         language_models = tuple(args.lms)
         trial_count = args.trial_count
@@ -255,12 +259,42 @@ class ClaimEvaluator(ABC):
         if Implementation.EVG_OPT in impls:
             for language_model in language_models:
                 for trial_id in range(trial_count):
-                    self.evaluate_optimized_query(language_model, trial_id)
+                    self.evaluate_optimized_query(
+                        Implementation.EVG_OPT,
+                        language_model,
+                        trial_id,
+                        use_reference_query=False,
+                    )
 
         if Implementation.EVG_UNOPT in impls:
             for language_model in language_models:
                 for trial_id in range(trial_count):
-                    self.evaluate_unoptimized_query(language_model, trial_id)
+                    self.evaluate_unoptimized_query(
+                        Implementation.EVG_UNOPT,
+                        language_model,
+                        trial_id,
+                        use_reference_query=False,
+                    )
+
+        if Implementation.EVG_OPT_REF_QUERY in impls:
+            for language_model in language_models:
+                for trial_id in range(trial_count):
+                    self.evaluate_optimized_query(
+                        Implementation.EVG_OPT_REF_QUERY,
+                        language_model,
+                        trial_id,
+                        use_reference_query=True,
+                    )
+
+        if Implementation.EVG_UNOPT_REF_QUERY in impls:
+            for language_model in language_models:
+                for trial_id in range(trial_count):
+                    self.evaluate_unoptimized_query(
+                        Implementation.EVG_UNOPT_REF_QUERY,
+                        language_model,
+                        trial_id,
+                        use_reference_query=True,
+                    )
 
         for impl, _ in OPTIMIZATION_CONFIGS.items():
             if impl in impls:
@@ -271,6 +305,35 @@ class ClaimEvaluator(ABC):
         if args.eval_sim_filter:
             self.evaluate_sim_filter(trial_count)
 
+    def compile_claim_to_query(self, trial_count: int) -> None:
+        for trial_id in range(trial_count):
+            model_config = CortexModelConfig(
+                language_models=[DEFAULT_LANGUAGE_MODEL],
+                embedding_model="",
+                connection_name=CONNECTION_NAME,
+            )
+            language_model = model_config.create_language_model(cache_dir=None)
+
+            compiler = ClaimCompiler(language_model)
+            result = compiler.compile(
+                self._agg_prompt, self._schema, self._claim, self._hints
+            )
+
+            obj = {
+                "metadata": {
+                    "name": self._name,
+                    "timestamp": self._timestamp,
+                    "claim": self._claim,
+                    "hints": self._hints,
+                    "schema": self._schema.to_dict(),
+                    "agg_prompt": self._agg_prompt,
+                },
+                "claim_compilation_result": result.to_dict(),
+            }
+
+            with open(self._compiled_query_path(trial_id), "w") as f:
+                json.dump(obj, f, indent=JSON_INDENT)
+
     def evaluate_reasoning_model(self, language_model: str, trial_id: int) -> None:
         setup_logging(
             self._log_file_path(Implementation.BASE_RM, (language_model,), trial_id)
@@ -280,9 +343,10 @@ class ClaimEvaluator(ABC):
 
         evaluation_result = reasoning_model.evaluate_claim(
             self._claim,
-            self.hints(),
+            self._hints,
+            self._agg_prompt,
             self._dataset_path,
-            self._schema_field_names,
+            self._schema,
             language_model,
         )
 
@@ -301,12 +365,11 @@ class ClaimEvaluator(ABC):
 
         evaluation_result = rag_agent.evaluate_claim(
             self._claim,
-            self.hints(),
+            self._hints,
             self._agg_prompt,
             self._dataset_path,
-            self._dataset_key,
+            self._schema,
             self._text_field_name,
-            self._schema_field_names,
             language_model,
         )
 
@@ -328,11 +391,11 @@ class ClaimEvaluator(ABC):
 
         evaluation_result = rlm.evaluate_claim(
             self._claim,
-            self.hints(),
+            self._hints,
+            self._agg_prompt,
             self._dataset_path,
-            self._dataset_key,
+            self._schema,
             self._text_field_name,
-            self._schema_field_names,
             language_model,
         )
 
@@ -372,8 +435,10 @@ class ClaimEvaluator(ABC):
             )
             return
 
-        df = ctx.read_json(self._dataset_path, self._dataset_key)
-        df = self.query(df, Implementation.EVG_REF, ENSEMBLE_LANGUAGE_MODELS, trial_id)
+        df = ctx.read_json(self._dataset_path, self._schema.key)
+        df = self.reference_query(
+            df, Implementation.EVG_REF, ENSEMBLE_LANGUAGE_MODELS, trial_id
+        )
         result = df.collect()
 
         verification_result, provenance = (
@@ -399,12 +464,47 @@ class ClaimEvaluator(ABC):
 
         logger.debug("Reference query evaluation completed")
 
-    def evaluate_unoptimized_query(self, language_model: str, trial_id: int) -> None:
-        setup_logging(
-            self._log_file_path(Implementation.EVG_UNOPT, (language_model,), trial_id)
+    def evaluate_optimized_query(
+        self,
+        impl: Implementation,
+        language_model: str,
+        trial_id: int,
+        use_reference_query: bool,
+    ) -> None:
+        setup_logging(self._log_file_path(impl, (language_model,), trial_id))
+
+        logger.debug("Evaluating optimized query (%s)", impl.value)
+
+        ctx = SessionContext.create_optimized(
+            random_seed=self._random_seed + trial_id,
+            cache_id=f"{self._cache_id}_{impl.value}_{language_model}_{trial_id}"
+            if self._cache_id
+            else None,
+        )
+        ctx.register_model_config(
+            CortexModelConfig(
+                [language_model],
+                EMBEDDING_MODEL,
+                CONNECTION_NAME,
+            )
         )
 
-        logger.debug("Evaluating unoptimized query")
+        self._evaluate_query(
+            ctx, impl, (language_model,), trial_id, use_reference_query
+        )
+
+        logger.debug("Optimized query evaluation completed (%s)", impl.value)
+
+    def evaluate_unoptimized_query(
+        self,
+        impl: Implementation,
+        language_model: str,
+        trial_id: int,
+        use_reference_query: bool,
+    ) -> None:
+        setup_logging(self._log_file_path(impl, (language_model,), trial_id))
+
+        logger.debug("Evaluating unoptimized query (%s)", impl.value)
 
         ctx = SessionContext()
         ctx.enable_batching()
@@ -417,47 +517,25 @@ class ClaimEvaluator(ABC):
             )
         )
 
-        post_sem_op_unopt_df_path = self._checkpoint_df_path(
-            CheckpointType.POST_SEM_OP,
-            Implementation.EVG_UNOPT,
-            (language_model,),
-            trial_id,
-        )
-        if post_sem_op_unopt_df_path.exists():
-            logger.debug(
-                f"{post_sem_op_unopt_df_path} exists, "
-                "skipping unoptimized query evaluation"
+        if use_reference_query:
+            post_sem_op_unopt_df_path = self._checkpoint_df_path(
+                CheckpointType.POST_SEM_OP,
+                impl,
+                (language_model,),
+                trial_id,
             )
-            return
+            if post_sem_op_unopt_df_path.exists():
+                logger.debug(
+                    f"{post_sem_op_unopt_df_path} exists, "
+                    "skipping unoptimized query evaluation"
+                )
+                return
 
-        self._evaluate_query(ctx, Implementation.EVG_UNOPT, (language_model,), trial_id)
-
-        logger.debug("Unoptimized query evaluation completed")
-
-    def evaluate_optimized_query(self, language_model: str, trial_id: int) -> None:
-        setup_logging(
-            self._log_file_path(Implementation.EVG_OPT, (language_model,), trial_id)
+        self._evaluate_query(
+            ctx, impl, (language_model,), trial_id, use_reference_query
         )
 
-        logger.debug("Evaluating optimized query")
-
-        ctx = SessionContext.create_optimized(
-            random_seed=self._random_seed + trial_id,
-            cache_id=f"{self._cache_id}_{language_model}_{trial_id}"
-            if self._cache_id
-            else None,
-        )
-        ctx.register_model_config(
-            CortexModelConfig(
-                [language_model],
-                EMBEDDING_MODEL,
-                CONNECTION_NAME,
-            )
-        )
-
-        self._evaluate_query(ctx, Implementation.EVG_OPT, (language_model,), trial_id)
-
-        logger.debug("Optimized query evaluation completed")
+        logger.debug("Unoptimized query evaluation completed (%s)", impl.value)
 
     def evaluate_query_with_config(
         self, impl: Implementation, language_model: str, trial_id: int
@@ -493,7 +571,9 @@ class ClaimEvaluator(ABC):
             CortexModelConfig([language_model], EMBEDDING_MODEL, CONNECTION_NAME)
         )
 
-        self._evaluate_query(ctx, impl, (language_model,), trial_id)
+        self._evaluate_query(
+            ctx, impl, (language_model,), trial_id, use_reference_query=True
+        )
 
         logger.debug("Query with config evaluation completed")
 
@@ -503,10 +583,33 @@ class ClaimEvaluator(ABC):
         impl: Implementation,
         language_models: tuple[str, ...],
         trial_id: int,
+        use_reference_query: bool,
     ) -> None:
-        df = ctx.read_json(self._dataset_path, self._dataset_key)
-        df = self.query(df, impl, language_models, trial_id)
+        df = ctx.read_json(self._dataset_path, self._schema.key)
+        if use_reference_query:
+            df = self.reference_query(df, impl, language_models, trial_id)
+        else:
+            df = ClaimCompiler.build_query(df, self._load_compiled_query(trial_id))
         result = df.collect()
+
+        if not use_reference_query:
+            verification_result = self._extract_verification_result(
+                result.rows, df.schema()
+            )
+            self._write_evaluation_result(
+                EvaluationResult(
+                    verification_result=verification_result,
+                    query_metrics=result.metrics,
+                    filter_metrics=None,
+                    map_metrics=None,
+                    prov_tokens={},
+                    reasoning=None,
+                ),
+                impl,
+                language_models,
+                trial_id,
+            )
+            return
 
         verification_result, provenance = (
             self._extract_verification_result_and_provenance(result.rows, df.schema())
@@ -569,20 +672,27 @@ class ClaimEvaluator(ABC):
             evaluation_result, impl, language_models, trial_id
         )
 
+    def _verdict_index(self, schema: Schema) -> int:
+        # `check` always appends the verdict as the final column.
+        return len(schema.fields) - 1
+
+    def _extract_verification_result(self, rows: list[Row], schema: Schema) -> bool:
+        if len(rows) == 0:
+            return False
+        assert len(rows) == 1
+        verification_result = rows[0][self._verdict_index(schema)]
+        assert isinstance(verification_result, bool)
+        return verification_result
+
     def _extract_verification_result_and_provenance(
         self, rows: list[Row], schema: Schema
     ) -> tuple[bool, Monomial]:
+        verification_result = self._extract_verification_result(rows, schema)
         if len(rows) == 0:
-            return False, frozenset()
-        assert len(rows) == 1
-        result = rows[0]
-        index = schema.index_of(str(self.check_predicate()))
-        verification_result = result[index]
-        assert isinstance(verification_result, bool)
-        monomials = result.get_prov_monomials(index)
+            return verification_result, frozenset()
+        monomials = rows[0].get_prov_monomials(self._verdict_index(schema))
         assert len(monomials) == 1
-        monomial = monomials[0]
-        return verification_result, monomial
+        return verification_result, monomials[0]
 
     def _write_evaluation_result(
         self,
@@ -598,7 +708,6 @@ class ClaimEvaluator(ABC):
                 "timestamp": self._timestamp,
                 "trial_id": trial_id,
                 "dataset_path": self._dataset_path,
-                "dataset_key": self._dataset_key,
                 "log_file": str(self._log_file_path(impl, language_models, trial_id)),
                 "random_seed": self._random_seed,
             },
@@ -612,6 +721,17 @@ class ClaimEvaluator(ABC):
         filter_prompt_str = self.filter_prompt_str()
         if filter_prompt_str is None:
             return
+
+        # The sensitivity analysis only depends on the (dataset, filter prompt)
+        # pair, so skip claims that share a filter prompt already analyzed.
+        for existing_path in RESULTS_DIR.rglob("sim_filter_sensitivity_analysis.json"):
+            with open(existing_path) as f:
+                existing_metadata = json.load(f)["metadata"]
+            if (
+                existing_metadata["filter_prompt"] == filter_prompt_str
+                and existing_metadata["dataset_path"] == self._dataset_path
+            ):
+                return
 
         thresholds = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55]
 
@@ -635,7 +755,7 @@ class ClaimEvaluator(ABC):
             assert query_vector is not None
             query_vectors.append(np.array(query_vector))
 
-        input_df = SessionContext().read_json(self._dataset_path, self._dataset_key)
+        input_df = SessionContext().read_json(self._dataset_path, self._schema.key)
         input_rows = input_df.collect().rows
         input_schema = input_df.schema()
 

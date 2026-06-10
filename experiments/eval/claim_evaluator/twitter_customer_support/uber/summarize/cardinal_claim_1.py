@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_SCHEMA
 
 
 class CardinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -26,11 +27,10 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the customer in this {dialog} complains about "
-                    "poor driver behavior (e.g., rude, unprofessional, unsafe driving, "
-                    "or other negative driver conduct)",
+                    "Identify whether the {dialog} contains a customer complaint about "
+                    "poor driver behavior",
                     bool,
-                ).alias("complains_poor_driver_behavior")
+                ).alias("complains_about_poor_driver_behavior")
             )
             .log(
                 str(
@@ -41,32 +41,29 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
             )
             .aggregate(
                 [
-                    count_if(col("complains_poor_driver_behavior")).alias(
-                        "poor_driver_count"
+                    count_if(col("complains_about_poor_driver_behavior")).alias(
+                        "poor_driver_complaint_count"
                     )
                 ]
             )
-            .check(col("poor_driver_count").eq(801))
+            .check(col("poor_driver_complaint_count").eq(801))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("poor_driver_count").eq(801)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("complains_poor_driver_behavior"),)
-
-    def hints(self) -> str:
-        return ""
+        return (col("complains_about_poor_driver_behavior"),)
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/uber/summarize/cardinal_claim_1_2026-06-01_22-05-35.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="cardinal_claim_1",
+        claim="801 customers complained about poor driver behavior.",
+        hints="",
+        schema=DIALOG_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/uber/summarize_2026-06-01_14-04-38.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

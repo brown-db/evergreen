@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class ProportionalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -56,17 +57,8 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("cash_only_criticism_prop") >= 0.1)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("cash_only_criticism_prop") >= 0.1
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("criticizes_cash_only"),)
-
-    def hints(self) -> str:
-        return (
-            "The phrase 'common criticisms' suggests a threshold of at least 10% "
-            "of the reviews that express criticism."
-        )
 
     def filter_prompt_str(self) -> str | None:
         return "The {text} expresses a criticism or complaint"
@@ -75,11 +67,17 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ProportionalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/johns_roast_pork/summarize/proportional_claim_1_2026-02-10_18-31-26.json"
+        name="proportional_claim_1",
+        claim="Common criticisms of John's Roast Pork include cash-only policy.",
+        hints=(
+            "The phrase 'common criticisms' suggests a threshold of at least 10% "
+            "of the reviews that express criticism."
         ),
-        dataset_key=("review_id",),
+        schema=REVIEW_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/johns_roast_pork/summarize_2026-02-10_18-24-08.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

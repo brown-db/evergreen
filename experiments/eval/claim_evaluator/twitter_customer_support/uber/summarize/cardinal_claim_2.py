@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_SCHEMA
 
 
 class CardinalClaim2Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -48,24 +49,21 @@ class CardinalClaim2Evaluator(ClaimEvaluator):
             .check(col("poor_driver_complaint_count") < 750)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("poor_driver_complaint_count") < 750
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("complains_about_poor_driver_behavior"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalClaim2Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/uber/summarize/cardinal_claim_2_2026-06-01_22-30-09.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="cardinal_claim_2",
+        claim="Less than 750 customers complained about poor driver behavior.",
+        hints="",
+        schema=DIALOG_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/uber/summarize_2026-06-01_14-04-38.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

@@ -5,6 +5,7 @@ from typing import cast
 
 import dspy  # type: ignore
 
+from evergreen.catalog.schema import Schema
 from evergreen.common.constants import CACHE_DIR_ROOT
 from evergreen.model.config import CortexModelConfig
 from evergreen.model.language_model import LanguageModelMetrics
@@ -24,21 +25,27 @@ class ClaimVerifier(dspy.Signature):
     by evidence in the dataset. A claim is NOT grounded if the dataset contradicts it or
     lacks sufficient evidence. Leverage your knowledge of first-order logic and its
     extensions to interpret the claim. Identify constants, variables, predicates,
-    functions, quantifiers, etc. Use the retrieve tool to quickly search the dataset for
-    witnesses or counterexamples to the claim. Use the sub-LLM to semantically reason
-    about (e.g., classify) each text field in the dataset. Use Python code to
-    symbolically reason (e.g., compute aggregates) over the dataset. These tools are
-    complementary and should be used in conjunction with each other when appropriate.
-    Do not stop until you are absolutely confident in your verdict, but also make sure
-    your execution is optimized for cost efficiency.
+    functions, quantifiers, etc. If hints are provided, use them for clarification.
+    Use the retrieve tool to quickly search the dataset for witnesses or counterexamples
+    to the claim. Use the sub-LLM to semantically reason about (e.g., classify) each
+    text field in the dataset. Use Python code to symbolically reason (e.g., compute
+    aggregates) over the dataset. These tools are complementary and should be used in
+    conjunction with each other when appropriate. Do not stop until you are absolutely
+    confident in your verdict.
     """
 
     dataset: list[dict[str, object]] = dspy.InputField(  # type: ignore
         description="The dataset to verify the claim against"
     )
+    agg_prompt: str = dspy.InputField(  # type: ignore
+        description=(
+            "The prompt over the dataset that generated a response containing the claim"
+        )
+    )
+    schema: str = dspy.InputField(description="The schema of the dataset")  # type: ignore
     claim: str = dspy.InputField(description="The claim to verify")  # type: ignore
     hints: str = dspy.InputField(  # type: ignore
-        description="Any hints for clarification on vague quantifier thresholds"
+        description="Optional clarifying hints for interpreting the claim"
     )
     grounded: bool = dspy.OutputField(  # type: ignore
         description=(
@@ -51,10 +58,10 @@ class ClaimVerifier(dspy.Signature):
 def evaluate_claim(
     claim: str,
     hints: str,
+    agg_prompt: str,
     dataset_path: str,
-    dataset_key: tuple[str, ...],
+    schema: Schema,
     text_field_name: str,
-    schema_field_names: set[str],
     language_model: str,
 ) -> EvaluationResult:
     conn = load_snowflake_connection(CONNECTION_NAME)
@@ -72,7 +79,7 @@ def evaluate_claim(
 
     with open(dataset_path) as f:
         dataset = [
-            {k: v for k, v in json.loads(line).items() if k in schema_field_names}
+            {k: v for k, v in json.loads(line).items() if k in schema.field_names()}
             for line in f
         ]
 
@@ -86,9 +93,8 @@ def evaluate_claim(
     )
     retrieval_engine = RetrievalEngine(
         dataset_path,
-        dataset_key,
+        schema,
         text_field_name,
-        schema_field_names,
         embedding_model,
     )
 
@@ -109,7 +115,13 @@ def evaluate_claim(
 
     t0 = time.perf_counter()
 
-    result = rlm(dataset=dataset, claim=claim, hints=hints)
+    result = rlm(
+        dataset=dataset,
+        agg_prompt=agg_prompt,
+        schema=str(schema),
+        claim=claim,
+        hints=hints,
+    )
 
     execution_latency = time.perf_counter() - t0
 
@@ -118,7 +130,7 @@ def evaluate_claim(
     reasoning = cast(list[dict[str, object]], result.trajectory)  # type: ignore
 
     def _get_usage(lm: dspy.LM) -> tuple[int, int, int]:
-        history = cast(list[dict[str, object]], lm.history)
+        history = cast(list[dict[str, object]], lm.history)  # type: ignore
         prompt_count = len(history)
         input_tokens = 0
         output_tokens = 0

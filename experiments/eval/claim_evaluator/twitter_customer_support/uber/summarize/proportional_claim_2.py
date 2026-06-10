@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_SCHEMA
 
 
 class ProportionalClaim2Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -26,7 +27,7 @@ class ProportionalClaim2Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether in the {dialog} the customer received "
+                    "Identify whether the {dialog} indicates a customer received "
                     "inconsistent or inaccurate information from the support agent",
                     bool,
                 ).alias("received_inconsistent_info")
@@ -48,24 +49,22 @@ class ProportionalClaim2Evaluator(ClaimEvaluator):
             .check(col("inconsistent_info_prop") < 0.40)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("inconsistent_info_prop") < 0.40
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("received_inconsistent_info"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ProportionalClaim2Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/uber/summarize/proportional_claim_2_2026-06-01_19-55-39.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="proportional_claim_2",
+        claim="Less than 40% of customers reported receiving inconsistent or "
+        "inaccurate information from support agents.",
+        hints="",
+        schema=DIALOG_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/uber/summarize_2026-06-01_14-04-38.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

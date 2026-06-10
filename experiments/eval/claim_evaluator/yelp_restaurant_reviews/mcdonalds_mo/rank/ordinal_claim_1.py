@@ -8,10 +8,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class OrdinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -50,17 +51,8 @@ class OrdinalClaim1Evaluator(ClaimEvaluator):
             .check(col("rank").eq(1))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("rank").eq(1)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("praises_service"),)
-
-    def hints(self) -> str:
-        return (
-            "Rank based on the proportion of reviews that speak positively about "
-            "the service at each restaurant."
-        )
 
     def filter_prompt_str(self) -> str | None:
         return "The {text} mentions the service at the restaurant"
@@ -69,11 +61,18 @@ class OrdinalClaim1Evaluator(ClaimEvaluator):
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = OrdinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/mcdonalds_mo/rank/ordinal_claim_1_2026-02-21_00-11-59.json"
+        name="ordinal_claim_1",
+        claim="The top-ranked McDonald's location in terms of service has the "
+        "Business ID XlbFKW_Keun8qh1S5m3QgQ.",
+        hints=(
+            "Rank based on, among the reviews that mention the service, the "
+            "proportion that speak positively about the service."
         ),
-        dataset_key=("review_id",),
+        schema=REVIEW_WITH_BUSINESS_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/rank_2026-02-20_20-01-21.json"
+        ),
         random_seed=42,
         cache_id="ordinal_claims_1_and_2",
     )

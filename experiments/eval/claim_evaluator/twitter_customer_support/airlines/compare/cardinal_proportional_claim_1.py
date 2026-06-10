@@ -14,10 +14,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -61,14 +62,8 @@ class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("num_companies_with_delay_complaints").eq(4))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("num_companies_with_delay_complaints").eq(4)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("about_flight_delays"),)
-
-    def hints(self) -> str:
-        return ""
 
     def filter_prompt_str(self) -> str | None:
         return "The {dialog} contains a customer complaint"
@@ -77,11 +72,15 @@ class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalProportionalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/airlines/compare/cardinal_proportional_claim_1_2026-06-02_14-17-13.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="cardinal_proportional_claim_1",
+        claim="There are 4 airline companies where over 10% of customer complaints are "
+        "regarding flight delays.",
+        hints="",
+        schema=DIALOG_WITH_COMPANY_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

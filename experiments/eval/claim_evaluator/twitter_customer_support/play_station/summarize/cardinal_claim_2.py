@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_SCHEMA
 
 
 class CardinalClaim2Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -48,24 +49,22 @@ class CardinalClaim2Evaluator(ClaimEvaluator):
             .check(col("account_login_count").ne(240))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("account_login_count").ne(240)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("has_account_or_login_issue"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalClaim2Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/play_station/summarize/cardinal_claim_2_2026-06-01_16-41-04.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="cardinal_claim_2",
+        claim="The number of customers experiencing problems with their accounts or "
+        "login issues is not 240.",
+        hints="",
+        schema=DIALOG_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/play_station/summarize_2026-06-01_14-04-42.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

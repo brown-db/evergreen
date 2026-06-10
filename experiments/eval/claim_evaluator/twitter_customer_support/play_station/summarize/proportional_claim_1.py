@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_SCHEMA
 
 
 class ProportionalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -26,7 +27,7 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} involves the customer experiencing "
+                    "Identify whether the {dialog} involves a customer experiencing "
                     "problems with payments or billing",
                     bool,
                 ).alias("has_payment_billing_issue")
@@ -48,24 +49,21 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("payment_billing_prop").eq(0.10))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("payment_billing_prop").eq(0.10)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("has_payment_billing_issue"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ProportionalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/play_station/summarize/proportional_claim_1_2026-06-01_14-23-13.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="proportional_claim_1",
+        claim="10% of customers are experiencing problems with payments or billing.",
+        hints="",
+        schema=DIALOG_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/play_station/summarize_2026-06-01_14-04-42.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

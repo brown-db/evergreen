@@ -1,4 +1,5 @@
 import logging
+import os
 import tomllib
 from pathlib import Path
 
@@ -79,7 +80,16 @@ EXPERIMENTS_DIR = Path("experiments")
 
 RESULTS_DIR = EXPERIMENTS_DIR / "results"
 
-LOGS_DIR = EXPERIMENTS_DIR / "logs"
+EXPERIMENT_DIR_ROOT_ENV_VAR = "EVERGREEN_EXPERIMENT_DIR_ROOT"
+
+if EXPERIMENT_DIR_ROOT_ENV_VAR not in os.environ:
+    raise ValueError(f"{EXPERIMENT_DIR_ROOT_ENV_VAR} environment variable is not set")
+
+EXPERIMENT_DIR_ROOT = Path(os.environ[EXPERIMENT_DIR_ROOT_ENV_VAR])
+
+LOGS_DIR = EXPERIMENT_DIR_ROOT / "logs"
+
+CHECKPOINTS_DIR = EXPERIMENT_DIR_ROOT / "checkpoints"
 
 TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 

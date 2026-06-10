@@ -36,6 +36,11 @@ Set cache directory:
 export EVERGREEN_CACHE_DIR_ROOT=~/.cache/evergreen/
 ```
 
+Set log directory (holds experiment logs and dataframe checkpoints):
+```sh
+export EVERGREEN_EXPERIMENT_DIR_ROOT=experiments/
+```
+
 Run tests (which depend on the docs) to ensure correct setup:
 ```sh
 uv run mkdocs build

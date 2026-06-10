@@ -13,10 +13,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class OrdinalClaim3Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -26,8 +27,8 @@ class OrdinalClaim3Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} contains a complaint about flight "
-                    "booking issues",
+                    "Identify whether the {dialog} contains a customer complaint about "
+                    "flight booking issues",
                     bool,
                 ).alias("has_booking_complaint")
             )
@@ -51,24 +52,22 @@ class OrdinalClaim3Evaluator(ClaimEvaluator):
             .check(col("rank").eq(1))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("rank").eq(1)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("has_booking_complaint"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = OrdinalClaim3Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/airlines/rank/ordinal_claim_3_2026-06-04_16-43-46.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="ordinal_claim_3",
+        claim="SouthwestAir has the most customer support dialogs with complaints "
+        "about flight booking issues.",
+        hints="",
+        schema=DIALOG_WITH_COMPANY_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/rank_2026-06-03_18-22-36.json"
+        ),
         random_seed=42,
         cache_id="ordinal_claims_3_and_4",
     )

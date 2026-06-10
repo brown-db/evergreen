@@ -8,10 +8,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class UniversalCardinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -47,24 +48,22 @@ class UniversalCardinalClaim1Evaluator(ClaimEvaluator):
             .check(col("all_have_multiple_complaints"))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("all_have_multiple_complaints")
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("complains_about_service"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = UniversalCardinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/mcdonalds_mo/compare/universal_cardinal_claim_1_2026-02-17_01-01-32.json"
-        ),
-        dataset_key=("review_id",),
+        name="universal_cardinal_claim_1",
+        claim="All McDonald's locations have multiple complaints about poor service "
+        "quality.",
+        hints="",
+        schema=REVIEW_WITH_BUSINESS_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

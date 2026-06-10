@@ -5,6 +5,7 @@ import time
 import tiktoken
 from pydantic import BaseModel
 
+from evergreen.catalog.schema import Schema
 from evergreen.common.constants import JSON_INDENT
 from evergreen.data_frame import QueryMetrics
 from evergreen.model.config import CortexLanguageModel, CortexModelConfig
@@ -30,8 +31,9 @@ def _count_tokens(text: str) -> int:
 def evaluate_claim(
     claim: str,
     hints: str,
+    agg_prompt: str,
     dataset_path: str,
-    schema_field_names: set[str],
+    schema: Schema,
     language_model: str,
 ) -> EvaluationResult:
     context_window_tokens = MODEL_CONTEXT_WINDOW_TOKENS[language_model]
@@ -42,6 +44,8 @@ def evaluate_claim(
         _PROMPT_TEMPLATE.format(
             dataset="",
             claim=claim,
+            agg_prompt=agg_prompt,
+            schema=schema,
             hints=hints,
             json_schema=_GROUNDING_QUERY_JSON_SCHEMA_STR,
             used=used_tokens,
@@ -68,7 +72,7 @@ def evaluate_claim(
     with open(dataset_path) as f:
         for line in f:
             obj = json.loads(line)
-            filtered_obj = {k: v for k, v in obj.items() if k in schema_field_names}
+            filtered_obj = {k: v for k, v in obj.items() if k in schema.field_names()}
 
             row_str = json.dumps(filtered_obj)
             # "\n".join() adds N-1 separators for N rows
@@ -87,6 +91,8 @@ def evaluate_claim(
     prompt_str = _PROMPT_TEMPLATE.format(
         dataset=dataset_str,
         claim=claim,
+        agg_prompt=agg_prompt,
+        schema=schema,
         hints=hints,
         json_schema=_GROUNDING_QUERY_JSON_SCHEMA_STR,
         used=used_tokens,
@@ -118,6 +124,8 @@ def evaluate_claim(
 _PROMPT_TEMPLATE = """<instructions>
 You are a fact checking expert.
 You are given a <dataset> of rows and a <claim> about the dataset.
+The <claim> was generated in response to the <agg_prompt> over the dataset.
+The provided <schema> describes the fields of the underlying data.
 Your goal is to determine if the <claim> is grounded in the <dataset>,
 i.e., fully supported by evidence in the dataset.
 A <claim> is NOT grounded if the <dataset> contradicts it or lacks sufficient evidence.
@@ -128,7 +136,7 @@ Steps:
   - Leverage your knowledge of first-order logic and its extensions here.
   - Identify the key logical components of the <claim>, such as constants,
   variables, predicates, functions, quantifiers, etc.
-  - If provided, use the <hints> below for clarification on vague quantifier thresholds.
+  - If provided, use the <hints> below for clarification.
 2. Output your final decision.
   - `true` if the claim is grounded in the dataset
   - `false` otherwise
@@ -137,6 +145,14 @@ Steps:
 <dataset>
 {dataset}
 </dataset>
+
+<agg_prompt>
+{agg_prompt}
+</agg_prompt>
+
+<schema>
+{schema}
+</schema>
 
 <claim>
 {claim}

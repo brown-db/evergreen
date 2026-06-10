@@ -8,10 +8,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class ExistentialClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -39,24 +40,21 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
             .check(col("some_enjoy_bacon_fries"))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("some_enjoy_bacon_fries")
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("enjoys_bacon_fries"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ExistentialClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/village_whiskey/summarize/existential_claim_1_2026-02-16_14-46-14.json"
-        ),
-        dataset_key=("review_id",),
+        name="existential_claim_1",
+        claim="Some reviewers enjoyed the restaurant's bacon fries.",
+        hints="",
+        schema=REVIEW_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

@@ -18,6 +18,7 @@ from anthropic.types import (
 from pydantic import BaseModel, Field, create_model
 
 from evergreen.catalog.schema import Field as SchemaField
+from evergreen.catalog.schema import Schema
 from evergreen.common.constants import CACHE_DIR_ROOT, EMBEDDING_FIELD_SUFFIX
 from evergreen.core.session_context import SessionContext
 from evergreen.data_frame import QueryMetrics
@@ -39,25 +40,25 @@ class RetrievalEngine:
     def __init__(
         self,
         dataset_path: str,
-        dataset_key: tuple[str, ...],
+        schema: Schema,
         text_field_name: str,
-        schema_field_names: set[str],
         embedding_model: EmbeddingModel,
     ) -> None:
         df = SessionContext().read_json(
             dataset_path,
-            dataset_key,
+            schema.key,
         )
 
-        self._schema = df.schema()
-        self._schema_field_names = schema_field_names
+        self._dataset_schema = df.schema()
+        self._claim_schema = schema
 
-        text_field_index = self._schema.index_of(text_field_name)
-        embedding_index = self._schema.index_of(
+        text_field_index = self._dataset_schema.index_of(text_field_name)
+        embedding_index = self._dataset_schema.index_of(
             text_field_name + EMBEDDING_FIELD_SUFFIX
         )
         field_indices = {
-            name: self._schema.index_of(name) for name in self._schema_field_names
+            name: self._dataset_schema.index_of(name)
+            for name in self._claim_schema.field_names()
         }
 
         doc_embeddings: list[list[float]] = []
@@ -68,7 +69,8 @@ class RetrievalEngine:
         for row in df.collect().rows:
             doc_embeddings.append(cast(list[float], row[embedding_index]))
             filtered_obj = {
-                name: row[field_indices[name]] for name in self._schema_field_names
+                name: row[field_indices[name]]
+                for name in self._claim_schema.field_names()
             }
             self._docs.append(str(row[text_field_index]))
             self._rows.append(filtered_obj)
@@ -85,8 +87,8 @@ class RetrievalEngine:
     def schema_fields(self) -> tuple[SchemaField, ...]:
         return tuple(
             field
-            for field in self._schema.fields
-            if field.name in self._schema_field_names
+            for field in self._dataset_schema.fields
+            if field.name in self._claim_schema.field_names()
         )
 
     def retrieve(
@@ -309,16 +311,16 @@ grounded in a dataset, i.e., fully supported by evidence in the dataset.
 A claim is NOT grounded if the dataset contradicts it or lacks sufficient evidence.
 
 ## Dataset
-- {row_count} total rows.
-- Fields per row: {field_names}.
-- Primary text field: `{text_field_name}`.
+- {row_count} total rows
+- Schema: {schema}
+- Primary text field: `{text_field_name}`
 
 ## Reasoning strategy
 At each step, think carefully about:
 1. **Claim formulation** — formally express the logical structure of the claim.
 Leverage your knowledge of first-order logic and its extensions. Identify
 constants, variables, predicates, functions, quantifiers, etc. If hints are
-provided, use them for clarification on vague quantifier thresholds.
+provided, use them for clarification.
 2. **Progress review** — summarize what you have searched for and found so far.
 3. **Gap analysis** — identify what evidence is still missing.
 4. **Next action** — decide whether to retrieve, continue_reading, or respond.
@@ -333,9 +335,8 @@ def evaluate_claim(
     hints: str,
     agg_prompt: str,
     dataset_path: str,
-    dataset_key: tuple[str, ...],
+    schema: Schema,
     text_field_name: str,
-    schema_field_names: set[str],
     language_model: str,
 ) -> EvaluationResult:
     conn = load_snowflake_connection(CONNECTION_NAME)
@@ -356,9 +357,8 @@ def evaluate_claim(
     )
     retrieval_engine = RetrievalEngine(
         dataset_path,
-        dataset_key,
+        schema,
         text_field_name,
-        schema_field_names,
         embedding_model,
     )
 
@@ -366,7 +366,7 @@ def evaluate_claim(
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
         row_count=retrieval_engine.row_count,
-        field_names=", ".join(f"`{name}`" for name in sorted(schema_field_names)),
+        schema=schema,
         text_field_name=text_field_name,
     )
 

@@ -15,6 +15,7 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class Satisfaction(Enum):
@@ -25,7 +26,7 @@ class Satisfaction(Enum):
 
 
 class ExistentialProportionalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -75,32 +76,25 @@ class ExistentialProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("some_mixed_bag"))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("some_mixed_bag")
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("satisfaction"),)
-
-    def hints(self) -> str:
-        return (
-            "Classify each customer support dialog's satisfaction as "
-            "positive (customer seems satisfied/happy with the resolution), "
-            "negative (customer seems dissatisfied/frustrated), "
-            "mixed (customer expresses both satisfaction and dissatisfaction), "
-            "or neutral (no clear satisfaction signal). "
-            "An airline's satisfaction is considered a 'mixed bag' if at least 20% of "
-            "its dialogs are positive or mixed AND at least 20% are negative or mixed."
-        )
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ExistentialProportionalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/airlines/compare/existential_proportional_claim_1_2026-06-03_12-02-11.json"
+        name="existential_proportional_claim_1",
+        claim="The customer satisfaction for some airlines was a mixed bag.",
+        hints=(
+            "Classify each dialog's satisfaction as positive, negative, mixed (both), "
+            "or neutral. An airline's satisfaction is a 'mixed bag' if at least 20% of "
+            "its dialogs are positive or mixed and at least 20% are negative or mixed."
         ),
-        dataset_key=("dialog_id",),
+        schema=DIALOG_WITH_COMPANY_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

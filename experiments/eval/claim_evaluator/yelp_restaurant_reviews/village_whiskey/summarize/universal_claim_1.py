@@ -8,10 +8,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class UniversalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -49,17 +50,8 @@ class UniversalClaim1Evaluator(ClaimEvaluator):
             .check(col("all_confirm_over_200"))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("all_confirm_over_200")
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("indicates_over_200"),)
-
-    def hints(self) -> str:
-        return (
-            "Interpret the claim as an implicit universal quantification over "
-            "all reviews that mention the number of whiskey varieties available."
-        )
 
     def filter_prompt_str(self) -> str | None:
         return "The {text} mentions the number of whiskey varieties available"
@@ -68,11 +60,17 @@ class UniversalClaim1Evaluator(ClaimEvaluator):
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = UniversalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/village_whiskey/summarize/universal_claim_1_2026-02-10_17-54-24.json"
+        name="universal_claim_1",
+        claim="There are over 200 varieties of whiskey available at Village Whiskey.",
+        hints=(
+            "Interpret the claim as an implicit universal quantification over "
+            "all reviews that mention the number of whiskey varieties available."
         ),
-        dataset_key=("review_id",),
+        schema=REVIEW_SCHEMA,
         text_field_name="text",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)

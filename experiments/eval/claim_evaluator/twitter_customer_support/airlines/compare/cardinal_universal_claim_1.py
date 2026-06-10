@@ -14,10 +14,11 @@ from experiments.claim_evaluator import (
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class CardinalUniversalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -56,14 +57,8 @@ class CardinalUniversalClaim1Evaluator(ClaimEvaluator):
             .check(col("num_companies_all_apologies").eq(2))
         )
 
-    def check_predicate(self) -> Expr:
-        return col("num_companies_all_apologies").eq(2)
-
     def semantic_map_columns(self) -> tuple[Expr, ...]:
         return (col("agent_apologizes"),)
-
-    def hints(self) -> str:
-        return ""
 
     def filter_prompt_str(self) -> str | None:
         return "The {dialog} contains a customer complaint"
@@ -72,11 +67,15 @@ class CardinalUniversalClaim1Evaluator(ClaimEvaluator):
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalUniversalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/twitter_customer_support/airlines/compare/cardinal_universal_claim_1_2026-06-02_15-21-36.json"
-        ),
-        dataset_key=("dialog_id",),
+        name="cardinal_universal_claim_1",
+        claim="There are 2 airline companies where the support agent apologizes in all "
+        "dialogs with a customer complaint.",
+        hints="",
+        schema=DIALOG_WITH_COMPANY_SCHEMA,
         text_field_name="dialog",
+        agg_result_path=Path(
+            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
+        ),
         random_seed=42,
     )
     claim_evaluator.evaluate(args)
