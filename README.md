@@ -8,8 +8,6 @@ This repository contains the code and experiments for [*Evergreen: Efficient Cla
 - [uv](https://docs.astral.sh/uv/)
 - [DuckDB](https://duckdb.org/)
 - [Snowflake account](https://signup.snowflake.com/) for [Cortex AI](https://www.snowflake.com/en/product/features/cortex/) language and embedding model access
-- [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/)
-- [Customer Support on Twitter Dataset](https://www.kaggle.com/datasets/thoughtvector/customer-support-on-twitter)
 
 ## Setup
 
@@ -41,61 +39,28 @@ Set log directory (holds experiment logs and dataframe checkpoints):
 export EVERGREEN_EXPERIMENT_DIR_ROOT=experiments/
 ```
 
-Run tests (which depend on the docs) to ensure correct setup:
+Build the documentation, which generates `site/llms-full.txt` (the API reference used by the claim compiler):
 ```sh
 uv run mkdocs build
+```
+
+Run tests to ensure correct setup:
+```sh
 uv run pytest
 ```
 
 ## Data Preparation
 
-Download the [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and extract to `data/yelp_dataset/`.
-Extract evaluation datasets using DuckDB.
+The datasets are sourced from the [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/) and the [Customer Support on Twitter Dataset](https://www.kaggle.com/datasets/thoughtvector/customer-support-on-twitter).
 
+Download both datasets and build the evaluation datasets:
 ```sh
-duckdb -c ".read experiments/scripts/yelp_restaurant_reviews/johns_roast_pork.sql"
-duckdb -c ".read experiments/scripts/yelp_restaurant_reviews/mcdonalds_mo.sql"
-duckdb -c ".read experiments/scripts/yelp_restaurant_reviews/village_whiskey.sql"
+./experiments/scripts/prepare_data.sh
 ```
 
-Download the [Customer Support on Twitter Dataset](https://www.kaggle.com/datasets/thoughtvector/customer-support-on-twitter) and extract to `data/twitter_customer_support/`.
-Reconstruct and extract evaluation datasets using Python and DuckDB.
-
+Add embeddings (requires a configured Snowflake connection):
 ```sh
-uv run python -m experiments.scripts.twitter_customer_support.reconstruct_dialogs \
-  --dataset_path data/twitter_customer_support/twcs.csv \
-  --output_dataset_path data/twitter_customer_support/twcs.jsonl
-
-duckdb -c ".read experiments/scripts/twitter_customer_support/airlines.sql"
-duckdb -c ".read experiments/scripts/twitter_customer_support/play_station.sql"
-duckdb -c ".read experiments/scripts/twitter_customer_support/uber.sql"
-```
-
-Add embeddings:
-```sh
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/yelp_restaurant_reviews/johns_roast_pork.jsonl \
-    --fields text
-
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/yelp_restaurant_reviews/mcdonalds_mo.jsonl \
-    --fields text
-
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/yelp_restaurant_reviews/village_whiskey.jsonl \
-    --fields text
-
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/twitter_customer_support/airlines.jsonl \
-    --fields dialog
-
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/twitter_customer_support/play_station.jsonl \
-    --fields dialog
-
-uv run python -m experiments.scripts.add_embeddings \
-    --dataset_path data/twitter_customer_support/uber.jsonl \
-    --fields dialog
+./experiments/scripts/add_embeddings.sh
 ```
 
 ## Reproducing Results
