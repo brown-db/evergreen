@@ -70,10 +70,10 @@ _ABLATION_STEP_LABELS = {
     "evg_opt": "All Opt",
     "evg_abl_no_es": "ES",
     "evg_abl_no_rs": "RS",
-    "evg_abl_no_est": "ECS",
-    "evg_abl_no_fus": "OF",
+    "evg_abl_no_ecs": "ECS",
+    "evg_abl_no_of": "OF",
     "evg_abl_no_sf": "SF",
-    "evg_abl_no_cache": "PC",
+    "evg_abl_no_pc": "PC",
 }
 
 ABLATION_IMPLEMENTATIONS = list(_ABLATION_STEP_LABELS)
@@ -98,7 +98,7 @@ ABLATION_APPLICABLE_CLAIMS = {
         "C16",
     ),
     "evg_abl_no_rs": ("C2", "C6", "C7", "C8", "C13", "C14"),
-    "evg_abl_no_est": (
+    "evg_abl_no_ecs": (
         "C1",
         "C3",
         "C4",
@@ -109,9 +109,9 @@ ABLATION_APPLICABLE_CLAIMS = {
         "C15",
         "C16",
     ),
-    "evg_abl_no_fus": ("C3", "C9", "C10", "C11", "C12", "C13", "C16"),
+    "evg_abl_no_of": ("C3", "C9", "C10", "C11", "C12", "C13", "C16"),
     "evg_abl_no_sf": ("C3", "C9", "C10", "C11", "C12", "C13", "C16"),
-    "evg_abl_no_cache": ("C9", "C10", "C11", "C12"),
+    "evg_abl_no_pc": ("C9", "C10", "C11", "C12"),
 }
 
 

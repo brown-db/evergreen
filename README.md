@@ -93,7 +93,7 @@ uv run python -m experiments.scripts.run_claim_evaluators \
     --lms claude-opus-4-6
 
 uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls evg_abl_no_es evg_abl_no_rs evg_abl_no_est evg_abl_no_fus evg_abl_no_sf evg_abl_no_cache \
+    --impls evg_abl_no_es evg_abl_no_rs evg_abl_no_ecs evg_abl_no_of evg_abl_no_sf evg_abl_no_pc \
     --lms claude-haiku-4-5
 
 uv run python -m experiments.scripts.run_claim_evaluators --eval_sim_filter

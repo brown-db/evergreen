@@ -58,10 +58,10 @@ class Implementation(Enum):
     # Evergreen ablations
     EVG_ABL_NO_ES = "evg_abl_no_es"  # Early stopping
     EVG_ABL_NO_RS = "evg_abl_no_rs"  # Relevance sorting
-    EVG_ABL_NO_EST = "evg_abl_no_est"  # Estimation with confidence sequences
-    EVG_ABL_NO_FUS = "evg_abl_no_fus"  # Operator fusion
+    EVG_ABL_NO_ECS = "evg_abl_no_ecs"  # Estimation with confidence sequences
+    EVG_ABL_NO_OF = "evg_abl_no_of"  # Operator fusion
     EVG_ABL_NO_SF = "evg_abl_no_sf"  # Similarity filtering
-    EVG_ABL_NO_CACHE = "evg_abl_no_cache"  # Prompt caching
+    EVG_ABL_NO_PC = "evg_abl_no_pc"  # Prompt caching
 
 
 @dataclass(frozen=True)
@@ -79,10 +79,10 @@ OPTIMIZATION_CONFIGS = {
         early_stop=False, relevance_sort=False, estimation=False
     ),
     Implementation.EVG_ABL_NO_RS: OptimizationConfig(relevance_sort=False),
-    Implementation.EVG_ABL_NO_EST: OptimizationConfig(estimation=False),
-    Implementation.EVG_ABL_NO_FUS: OptimizationConfig(fusion=False),
+    Implementation.EVG_ABL_NO_ECS: OptimizationConfig(estimation=False),
+    Implementation.EVG_ABL_NO_OF: OptimizationConfig(fusion=False),
     Implementation.EVG_ABL_NO_SF: OptimizationConfig(similarity_filter=False),
-    Implementation.EVG_ABL_NO_CACHE: OptimizationConfig(cache=False),
+    Implementation.EVG_ABL_NO_PC: OptimizationConfig(cache=False),
 }
 
 
