@@ -103,7 +103,7 @@ uv run python -m experiments.scripts.add_embeddings \
 Run the full evaluation:
 ```sh
 uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls base_rm rag_agent \
+    --impls base_rm rag_agent rlm \
     --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5
 
 uv run python -m experiments.scripts.run_claim_evaluators \
