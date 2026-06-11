@@ -417,7 +417,7 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating reference query")
 
         ctx = SessionContext()
-        ctx.enable_batching()
+        ctx.enable_batching(batch_size=128)
         ctx.enable_minimal_provenance()
         # We can add cache for reference, since we do not care about cost and
         # latency here.
