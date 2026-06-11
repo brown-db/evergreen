@@ -42,7 +42,9 @@ class ClaimVerifier(dspy.Signature):
             "The prompt over the dataset that generated a response containing the claim"
         )
     )
-    schema: str = dspy.InputField(description="The schema of the dataset")  # type: ignore
+    dataset_schema: str = dspy.InputField(  # type: ignore
+        description="The schema of the dataset"
+    )
     claim: str = dspy.InputField(description="The claim to verify")  # type: ignore
     hints: str = dspy.InputField(  # type: ignore
         description="Optional clarifying hints for interpreting the claim"
@@ -118,7 +120,7 @@ def evaluate_claim(
     result = rlm(
         dataset=dataset,
         agg_prompt=agg_prompt,
-        schema=str(schema),
+        dataset_schema=str(schema),
         claim=claim,
         hints=hints,
     )
