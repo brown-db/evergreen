@@ -417,15 +417,11 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating reference query")
 
         ctx = SessionContext()
-        ctx.enable_batching(batch_size=128)
+        ctx.enable_batching(batch_size=2048)
         ctx.enable_minimal_provenance()
         # We can add cache for reference, since we do not care about cost and
         # latency here.
-        ctx.enable_cache(
-            f"{self._cache_id}_{Implementation.EVG_REF.value}"
-            if self._cache_id
-            else None
-        )
+        ctx.enable_cache(f"{Implementation.EVG_REF.value}_cache")
         ctx.register_model_config(
             CortexModelConfig(
                 ENSEMBLE_LANGUAGE_MODELS,
