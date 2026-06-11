@@ -8,6 +8,7 @@ This repository contains the code and experiments for [*Evergreen: Efficient Cla
 - [uv](https://docs.astral.sh/uv/)
 - [DuckDB](https://duckdb.org/)
 - [Snowflake account](https://signup.snowflake.com/) for [Cortex AI](https://www.snowflake.com/en/product/features/cortex/) language and embedding model access
+- [Deno](https://deno.com/) (only required for [RLM](https://dspy.ai/api/modules/RLM/) experiments)
 
 ## Setup
 
@@ -15,6 +16,11 @@ Install dependencies:
 ```sh
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
+```
+
+To run experiments with [RLM](https://dspy.ai/api/modules/RLM/), install [Deno](https://deno.com/) and then restart your shell (or re-source your shell profile) so the updated `PATH` takes effect:
+```sh
+curl -fsSL https://deno.land/install.sh | sh
 ```
 
 Configure [Snowflake connection](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect#connecting-using-the-connections-toml-file) by creating `~/.snowflake/connections.toml`:
