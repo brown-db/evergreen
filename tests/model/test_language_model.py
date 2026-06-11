@@ -17,9 +17,8 @@ class TestCortexLanguageModel:
             [DEFAULT_LANGUAGE_MODEL],
             [
                 "claude-opus-4-6",
-                "openai-gpt-5.4",
+                "openai-gpt-5.5",
                 "gemini-3.1-pro",
-                "deepseek-r1",
             ],
         ],
     )
