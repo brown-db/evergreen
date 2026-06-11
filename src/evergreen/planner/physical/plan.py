@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import pickle
 import random
+import sys
 from abc import ABC, abstractmethod
 from collections import Counter, deque
 from itertools import groupby
@@ -1153,7 +1154,12 @@ class Log(PhysicalPlan):
         return None
 
     def close(self) -> None:
-        with open(self._path, "wb") as f:
-            pickle.dump((self._rows, self._schema), f)
-        logger.debug("Logged %d rows to %s", len(self._rows), self._path)
+        # Only persist a checkpoint on a clean run. When an exception or Ctrl-C
+        # (KeyboardInterrupt) propagates through the caller's `finally`,
+        # `sys.exc_info()` reports it here, so we skip writing a truncated
+        # checkpoint that a later run would mistake for complete results.
+        if sys.exc_info()[0] is None:
+            with open(self._path, "wb") as f:
+                pickle.dump((self._rows, self._schema), f)
+            logger.debug("Logged %d rows to %s", len(self._rows), self._path)
         self._input.close()
