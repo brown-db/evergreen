@@ -156,9 +156,6 @@ class ClaimEvaluator(ABC):
         self._results_dir = RESULTS_DIR / claim_subdir
         self._checkpoints_dir = CHECKPOINTS_DIR / claim_subdir
 
-        for d in (self._logs_dir, self._results_dir, self._checkpoints_dir):
-            d.mkdir(parents=True, exist_ok=True)
-
         self._timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
 
         self._post_sem_op_reference_df_path = self._checkpoint_df_path(
@@ -331,7 +328,9 @@ class ClaimEvaluator(ABC):
                 "claim_compilation_result": result.to_dict(),
             }
 
-            with open(self._compiled_query_path(trial_id), "w") as f:
+            compiled_query_path = self._compiled_query_path(trial_id)
+            compiled_query_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(compiled_query_path, "w") as f:
                 json.dump(obj, f, indent=JSON_INDENT)
 
     def evaluate_reasoning_model(self, language_model: str, trial_id: int) -> None:
@@ -721,7 +720,9 @@ class ClaimEvaluator(ABC):
             "evaluation_result": evaluation_result.to_dict(),
         }
 
-        with open(self._results_file_path(impl, language_models, trial_id), "w") as f:
+        results_file_path = self._results_file_path(impl, language_models, trial_id)
+        results_file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(results_file_path, "w") as f:
             json.dump(results, f, indent=JSON_INDENT)
 
     def evaluate_sim_filter(self, trial_count: int) -> None:
@@ -809,6 +810,7 @@ class ClaimEvaluator(ABC):
             )
 
         output_path = self._results_dir / "sim_filter_sensitivity_analysis.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
             json.dump(
                 {

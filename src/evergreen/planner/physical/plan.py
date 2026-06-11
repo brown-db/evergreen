@@ -7,6 +7,7 @@ import sys
 from abc import ABC, abstractmethod
 from collections import Counter, deque
 from itertools import groupby
+from pathlib import Path
 from typing import Protocol, cast
 
 import numpy as np
@@ -1128,7 +1129,7 @@ class Shuffle(PhysicalPlan):
 
 
 class Log(PhysicalPlan):
-    def __init__(self, path: str, input: PhysicalPlan, schema: Schema) -> None:
+    def __init__(self, path: Path, input: PhysicalPlan, schema: Schema) -> None:
         super().__init__()
         self._path = path
         self._input = input
@@ -1159,6 +1160,7 @@ class Log(PhysicalPlan):
         # `sys.exc_info()` reports it here, so we skip writing a truncated
         # checkpoint that a later run would mistake for complete results.
         if sys.exc_info()[0] is None:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._path, "wb") as f:
                 pickle.dump((self._rows, self._schema), f)
             logger.debug("Logged %d rows to %s", len(self._rows), self._path)

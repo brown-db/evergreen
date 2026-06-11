@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from evergreen.catalog.schema import Field, Schema
 from evergreen.catalog.table import TableProvider
@@ -356,11 +357,11 @@ class Log(LogicalPlan):
     but before the aggregation.
     """
 
-    path: str
+    path: Path
     input: LogicalPlan
 
     def __repr__(self) -> str:
-        return f"log(path={self.path!r})"
+        return f"log(path={str(self.path)!r})"
 
     def with_inputs(self, inputs: tuple[LogicalPlan, ...]) -> LogicalPlan:
         assert len(inputs) == 1

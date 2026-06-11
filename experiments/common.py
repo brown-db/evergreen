@@ -83,6 +83,7 @@ TIMESTAMP_FORMAT = "%Y-%m-%d_%H-%M-%S"
 
 
 def setup_logging(log_file: Path) -> None:
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(str(log_file), mode="w")
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(

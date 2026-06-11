@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 from evergreen.catalog.table import TableProvider
 from evergreen.planner.logical.expr import Expr
@@ -49,7 +50,7 @@ class LogicalPlanBuilder:
         return LogicalPlanBuilder(WithRank(expr, descending, self._plan))
 
     def log(self, path: str) -> LogicalPlanBuilder:
-        return LogicalPlanBuilder(Log(path, self._plan))
+        return LogicalPlanBuilder(Log(Path(path), self._plan))
 
     def build(self) -> LogicalPlan:
         return self._plan
