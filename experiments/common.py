@@ -14,7 +14,7 @@ EVALUATION_LANGUAGE_MODELS = (
     "llama3.1-8b",
 )
 
-ENSEMBLE_LANGUAGE_MODELS = ("claude-opus-4-6", "openai-gpt-5.5", "gemini-3.1-pro")
+ENSEMBLE_LANGUAGE_MODELS = ("claude-opus-4-6", "openai-gpt-5.5", "gemini-3.5-flash")
 
 MODEL_CONTEXT_WINDOW_TOKENS = {
     "claude-opus-4-6": 200_000,
