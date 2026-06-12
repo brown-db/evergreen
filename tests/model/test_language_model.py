@@ -17,6 +17,7 @@ class TestCortexLanguageModel:
             [DEFAULT_LANGUAGE_MODEL],
             [
                 "claude-opus-4-6",
+                "claude-opus-4-8",
                 "openai-gpt-5.5",
                 "gemini-3.5-flash",
             ],
