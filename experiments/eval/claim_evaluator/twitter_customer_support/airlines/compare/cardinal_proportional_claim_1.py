@@ -54,7 +54,7 @@ class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
             )
             .aggregate(
                 [
-                    count_if(col("delay_complaint_prop") > 0.10).alias(
+                    count_if(col("delay_complaint_prop") > 0.15).alias(
                         "num_companies_with_delay_complaints"
                     )
                 ]
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalProportionalClaim1Evaluator(
         name="cardinal_proportional_claim_1",
-        claim="There are 4 airline companies where over 10% of customer complaints are "
+        claim="There are 4 airline companies where over 15% of customer complaints are "
         "regarding flight delays.",
         hints="",
         schema=DIALOG_WITH_COMPANY_SCHEMA,

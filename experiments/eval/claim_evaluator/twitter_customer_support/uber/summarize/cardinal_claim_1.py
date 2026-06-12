@@ -46,7 +46,7 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
                     )
                 ]
             )
-            .check(col("poor_driver_complaint_count").eq(801))
+            .check(col("poor_driver_complaint_count").eq(785))
         )
 
     def semantic_map_columns(self) -> tuple[Expr, ...]:
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = CardinalClaim1Evaluator(
         name="cardinal_claim_1",
-        claim="801 customers complained about poor driver behavior.",
+        claim="785 customers complained about poor driver behavior.",
         hints="",
         schema=DIALOG_SCHEMA,
         text_field_name="dialog",

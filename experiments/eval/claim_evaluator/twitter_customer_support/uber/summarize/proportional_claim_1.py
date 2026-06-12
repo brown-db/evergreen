@@ -46,7 +46,7 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
                     )
                 ]
             )
-            .check(col("inconsistent_info_prop") < 0.25)
+            .check(col("inconsistent_info_prop") < 0.10)
         )
 
     def semantic_map_columns(self) -> tuple[Expr, ...]:
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ProportionalClaim1Evaluator(
         name="proportional_claim_1",
-        claim="Less than 25% of customers reported receiving inconsistent or "
+        claim="Less than 10% of customers reported receiving inconsistent or "
         "inaccurate information from support agents.",
         hints="",
         schema=DIALOG_SCHEMA,
