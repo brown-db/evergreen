@@ -23,9 +23,9 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
             df.map(
                 prompt(
                     "Identify whether the {text} expresses enjoyment of the "
-                    "restaurant's bacon fries",
+                    "restaurant's calamari",
                     bool,
-                ).alias("enjoys_bacon_fries")
+                ).alias("enjoys_calamari")
             )
             .log(
                 str(
@@ -34,21 +34,19 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .aggregate(
-                [bool_or(col("enjoys_bacon_fries")).alias("some_enjoy_bacon_fries")]
-            )
-            .check(col("some_enjoy_bacon_fries"))
+            .aggregate([bool_or(col("enjoys_calamari")).alias("some_enjoy_calamari")])
+            .check(col("some_enjoy_calamari"))
         )
 
     def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("enjoys_bacon_fries"),)
+        return (col("enjoys_calamari"),)
 
 
 if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = ExistentialClaim1Evaluator(
         name="existential_claim_1",
-        claim="Some reviewers enjoyed the restaurant's bacon fries.",
+        claim="Some reviewers enjoyed the restaurant's calamari.",
         hints="",
         schema=REVIEW_SCHEMA,
         text_field_name="text",
