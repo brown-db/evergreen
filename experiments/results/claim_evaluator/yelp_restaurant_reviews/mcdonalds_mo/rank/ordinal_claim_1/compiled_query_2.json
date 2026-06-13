@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "ordinal_claim_1",
+    "timestamp": "2026-06-12_22-06-42",
+    "claim": "The top-ranked McDonald's location in terms of service has the Business ID XlbFKW_Keun8qh1S5m3QgQ.",
+    "hints": "Rank based on, among the reviews that mention the service, the proportion that speak positively about the service.",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Analyze the reviews for the the different McDonald''s locations and describe the top 3 locations in terms of their service."
+  },
+  "claim_compilation_result": {
+    "response": "Looking at this claim, I need to verify that the McDonald's location with business_id \"XlbFKW_Keun8qh1S5m3QgQ\" has the highest proportion of positive service mentions among reviews that discuss service.\n\n**Step 1: Logical Structure**\n\nThe claim states:\n- Among all McDonald's locations, rank them by the proportion of service-mentioning reviews that speak positively about service.\n- The location with business_id \"XlbFKW_Keun8qh1S5m3QgQ\" should be ranked #1.\n\n**Step 2: Query Design**\n\n1. First, filter to reviews that mention service.\n2. Then, map each review to whether it speaks positively about the service.\n3. Aggregate by business_id to compute the proportion of positive service reviews per location.\n4. Rank by that proportion (descending).\n5. Filter to the specific business_id and check that its rank is 1.\n\n**Step 3: Query**\n\n```python\n(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} speaks positively about the service at the restaurant\",\n            bool\n        ).alias(\"positive_service\")\n    )\n    .aggregate(\n        [proportion(col(\"positive_service\")).alias(\"positive_service_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"positive_service_prop\"))\n    .filter(col(\"business_id\").eq(\"XlbFKW_Keun8qh1S5m3QgQ\"))\n    .check(col(\"rank\").eq(1))\n)\n```",
+    "query": "(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} speaks positively about the service at the restaurant\",\n            bool\n        ).alias(\"positive_service\")\n    )\n    .aggregate(\n        [proportion(col(\"positive_service\")).alias(\"positive_service_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"positive_service_prop\"))\n    .filter(col(\"business_id\").eq(\"XlbFKW_Keun8qh1S5m3QgQ\"))\n    .check(col(\"rank\").eq(1))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7665,
+        "output_token_count": 414,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.134167958982289
+  }
+}

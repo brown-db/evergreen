@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "universal_cardinal_claim_1",
+    "timestamp": "2026-06-12_22-06-05",
+    "claim": "All McDonald's locations have multiple complaints about poor service quality.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Compare the reviews for the different McDonald''s locations. Highlight the commonalities and differences between the restaurant locations."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"All McDonald's locations have multiple complaints about poor service quality.\"\n\nFormally:\n- \u2200 location l: count({r \u2208 reviews(l) | complains_about_poor_service(r)}) \u2265 2\n\nThis is a universal quantifier over locations (grouped by `business_id`), where each location must have multiple (at least 2) reviews that complain about poor service quality.\n\n## Step 2: Query Operators and Expressions\n\n1. **Map**: Label each review with whether it complains about poor service quality \u2192 boolean column\n2. **Aggregate**: Count complaints per location (group by `business_id`) using `count_if()`\n3. **Aggregate**: Check that ALL locations have multiple complaints (count \u2265 2) using `bool_and()`\n4. **Check**: Verify the final predicate\n\nThe key components:\n- `map()` to identify reviews complaining about poor service quality\n- `aggregate()` with `group_by=[col(\"business_id\")]` to count complaints per location\n- `bool_and()` to verify all locations meet the threshold\n- \"Multiple\" means at least 2\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {text} complains about poor service quality\",\n            bool\n        ).alias(\"complains_poor_service\")\n    )\n    .aggregate(\n        [count_if(col(\"complains_poor_service\")).alias(\"complaint_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [bool_and(col(\"complaint_count\") >= 2).alias(\"all_have_multiple_complaints\")]\n    )\n    .check(col(\"all_have_multiple_complaints\"))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {text} complains about poor service quality\",\n            bool\n        ).alias(\"complains_poor_service\")\n    )\n    .aggregate(\n        [count_if(col(\"complains_poor_service\")).alias(\"complaint_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [bool_and(col(\"complaint_count\") >= 2).alias(\"all_have_multiple_complaints\")]\n    )\n    .check(col(\"all_have_multiple_complaints\"))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7613,
+        "output_token_count": 449,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.533965207985602
+  }
+}

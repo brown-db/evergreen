@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "proportional_claim_1",
+    "timestamp": "2026-06-12_22-10-19",
+    "claim": "Village Whiskey has received majority positive reviews.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Summarize the reviews for Village Whiskey."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim \"Village Whiskey has received majority positive reviews\" can be expressed as:\n\n- Let P(x) = \"review x has a positive sentiment\"\n- The claim states that the proportion of reviews where P(x) is true is greater than 0.5 (majority)\n\nFormally: proportion({x | P(x)}) > 0.5\n\n## Step 2: Identifying Query Operators and Expressions\n\n- The claim is about the overall sentiment of reviews being majority positive.\n- Since the schema already scopes the data to Village Whiskey reviews (as indicated by the `agg_prompt`), no filtering by entity is needed.\n- I need to:\n  1. `map()` each review to determine if it has a positive sentiment (boolean)\n  2. `aggregate()` to compute the proportion of positive reviews\n  3. `check()` that the proportion is greater than 0.5 (majority)\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {text} has a positive sentiment overall\", bool\n        ).alias(\"is_positive\")\n    )\n    .aggregate(\n        [proportion(col(\"is_positive\")).alias(\"positive_prop\")]\n    )\n    .check(col(\"positive_prop\") > 0.5)\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {text} has a positive sentiment overall\", bool\n        ).alias(\"is_positive\")\n    )\n    .aggregate(\n        [proportion(col(\"is_positive\")).alias(\"positive_prop\")]\n    )\n    .check(col(\"positive_prop\") > 0.5)\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7584,
+        "output_token_count": 334,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 7.989507083024364
+  }
+}

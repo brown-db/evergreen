@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "proportional_claim_1",
+    "timestamp": "2026-06-12_21-58-03",
+    "claim": "10% of customers are experiencing problems with payments or billing.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Summarize the customer issues and problematic agent responses in customer support dialogs for PlayStation. Integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"10% of customers are experiencing problems with payments or billing.\"\n\nFormally:\n- Let P(x) = \"customer dialog x is about problems with payments or billing\"\n- The claim asserts: proportion({x | P(x)}) \u2248 0.10\n\nThis is a proportion claim over all customer support dialogs, checking that approximately 10% involve payment or billing problems.\n\n## Step 2: Query Operators and Expressions\n\n- The dataset contains customer support dialogs for PlayStation.\n- I need to determine what proportion of dialogs involve payment or billing problems.\n- I'll use `map()` with a prompt to identify whether each dialog is about payment/billing issues.\n- Then `aggregate()` with `proportion()` to compute the ratio.\n- Finally `check()` to verify it equals 0.10.\n\nSince the claim says \"10%\" which is a specific number, I'll check equality with 0.10.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {dialog} involves the customer experiencing problems with payments or billing\",\n            bool\n        ).alias(\"payment_or_billing_issue\")\n    )\n    .aggregate(\n        [proportion(col(\"payment_or_billing_issue\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").eq(0.10))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {dialog} involves the customer experiencing problems with payments or billing\",\n            bool\n        ).alias(\"payment_or_billing_issue\")\n    )\n    .aggregate(\n        [proportion(col(\"payment_or_billing_issue\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").eq(0.10))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7601,
+        "output_token_count": 353,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.18931712495396
+  }
+}

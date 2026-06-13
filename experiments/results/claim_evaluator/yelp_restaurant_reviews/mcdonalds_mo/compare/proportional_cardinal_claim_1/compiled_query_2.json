@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "proportional_cardinal_claim_1",
+    "timestamp": "2026-06-12_22-04-49",
+    "claim": "Only a minority of McDonald's locations had multiple reports of incorrect orders.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Compare the reviews for the different McDonald''s locations. Highlight the commonalities and differences between the restaurant locations."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"Only a minority of McDonald's locations had multiple reports of incorrect orders.\"\n\nBreaking this down:\n- For each McDonald's location (grouped by `business_id`), count how many reviews report incorrect orders\n- A location has \"multiple reports\" if it has more than 1 review mentioning incorrect orders\n- \"Only a minority\" means the proportion of locations with multiple reports is less than 50% (minority = less than half)\n\nFormally:\n- Let `has_incorrect_order(review)` = the review mentions an incorrect order\n- Let `multiple_reports(location)` = count of reviews with incorrect orders > 1\n- Claim: proportion of locations where `multiple_reports(location)` is true < 0.5\n\n## Step 2: Query Design\n\n1. First, I need to `map()` each review to identify if it mentions an incorrect order.\n2. Then `aggregate()` by `business_id` to count incorrect order reports per location.\n3. Then compute the proportion of locations that have multiple (>1) reports of incorrect orders.\n4. Check that this proportion is less than 0.5 (minority).\n\n## Step 3: Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the {text} mentions receiving an incorrect order\",\n            bool\n        ).alias(\"mentions_incorrect_order\")\n    )\n    .aggregate(\n        [count_if(col(\"mentions_incorrect_order\")).alias(\"incorrect_order_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [proportion(col(\"incorrect_order_count\") > 1).alias(\"prop_with_multiple_reports\")]\n    )\n    .check(col(\"prop_with_multiple_reports\") < 0.5)\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the {text} mentions receiving an incorrect order\",\n            bool\n        ).alias(\"mentions_incorrect_order\")\n    )\n    .aggregate(\n        [count_if(col(\"mentions_incorrect_order\")).alias(\"incorrect_order_count\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [proportion(col(\"incorrect_order_count\") > 1).alias(\"prop_with_multiple_reports\")]\n    )\n    .check(col(\"prop_with_multiple_reports\") < 0.5)\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7615,
+        "output_token_count": 439,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.325359332957305
+  }
+}

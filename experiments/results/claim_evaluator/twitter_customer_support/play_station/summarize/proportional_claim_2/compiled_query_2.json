@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "proportional_claim_2",
+    "timestamp": "2026-06-12_21-58-38",
+    "claim": "The percentage of customers experiencing problems with payments or billing is not 10%.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Summarize the customer issues and problematic agent responses in customer support dialogs for PlayStation. Integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"The percentage of customers experiencing problems with payments or billing is not 10%.\"\n\nFormally:\n- Let P = proportion of dialogs where the customer experiences problems with payments or billing\n- Claim: P \u2260 0.10\n\nThis is a negation of equality. In NNF, this is already atomic (inequality is a primitive comparison), so no further transformation is needed.\n\n## Step 2: Query Operators and Expressions\n\n1. I need to identify which dialogs involve customers experiencing problems with payments or billing. This is a semantic feature that should be extracted via `map()` with a boolean prompt.\n2. Then I need to compute the proportion of such dialogs.\n3. Finally, I check that this proportion is not equal to 0.10.\n\nThe schema has `dialog` as the text field containing the customer support dialog. I'll use `map()` to label each dialog as having a payment/billing problem or not, then `aggregate()` with `proportion()`, and finally `check()` that the proportion is not 0.10.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the customer in the {dialog} is experiencing a problem with payments or billing\",\n            bool\n        ).alias(\"has_payment_billing_problem\")\n    )\n    .aggregate(\n        [proportion(col(\"has_payment_billing_problem\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").ne(0.10))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the customer in the {dialog} is experiencing a problem with payments or billing\",\n            bool\n        ).alias(\"has_payment_billing_problem\")\n    )\n    .aggregate(\n        [proportion(col(\"has_payment_billing_problem\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").ne(0.10))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7604,
+        "output_token_count": 380,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.035051707993262
+  }
+}

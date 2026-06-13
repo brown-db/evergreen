@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "ordinal_claim_2",
+    "timestamp": "2026-06-12_22-07-17",
+    "claim": "The McDonald's location ranked #2 in terms of service has the Business ID 9eYm5gwEOhBQdkg9ihV7EA.",
+    "hints": "Rank based on, among the reviews that mention the service, the proportion that speak positively about the service.",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The free-form text of a customer review."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Analyze the reviews for the the different McDonald''s locations and describe the top 3 locations in terms of their service."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states that when McDonald's locations are ranked by service quality (specifically, by the proportion of service-mentioning reviews that speak positively about service), the location with Business ID \"9eYm5gwEOhBQdkg9ihV7EA\" holds rank #2.\n\nKey components:\n- **Scope**: Reviews that mention service\n- **Feature**: Whether the review speaks positively about service\n- **Aggregation**: Proportion of positive service mentions, grouped by business_id\n- **Ranking**: Descending by proportion (higher proportion = better rank)\n- **Check**: The specific business_id has rank 2\n\n## Step 2: Query Operators and Expressions\n\n1. **Filter** to reviews that mention service using `filter(prompt(...))`.\n2. **Map** to identify whether each review speaks positively about service using `map(prompt(..., bool))`.\n3. **Aggregate** the proportion of positive service reviews, grouped by `business_id`.\n4. **Rank** by the proportion (descending - higher proportion = rank 1).\n5. **Filter** to the specific business_id.\n6. **Check** that its rank equals 2.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} speaks positively about the service\",\n            bool\n        ).alias(\"positive_service\")\n    )\n    .aggregate(\n        [proportion(col(\"positive_service\")).alias(\"positive_service_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"positive_service_prop\"))\n    .filter(col(\"business_id\").eq(\"9eYm5gwEOhBQdkg9ihV7EA\"))\n    .check(col(\"rank\").eq(2))\n)\n```",
+    "query": "(\n    df.filter(\n        prompt(\"The {text} mentions the service at the restaurant\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the {text} speaks positively about the service\",\n            bool\n        ).alias(\"positive_service\")\n    )\n    .aggregate(\n        [proportion(col(\"positive_service\")).alias(\"positive_service_prop\")],\n        group_by=[col(\"business_id\")]\n    )\n    .with_rank(col(\"positive_service_prop\"))\n    .filter(col(\"business_id\").eq(\"9eYm5gwEOhBQdkg9ihV7EA\"))\n    .check(col(\"rank\").eq(2))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7664,
+        "output_token_count": 475,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.676896624965593
+  }
+}

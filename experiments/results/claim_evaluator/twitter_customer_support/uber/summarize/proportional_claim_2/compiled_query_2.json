@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "proportional_claim_2",
+    "timestamp": "2026-06-12_22-01-01",
+    "claim": "Less than 25% of customers reported receiving inconsistent or inaccurate information from support agents.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Summarize the customer issues and problematic agent responses in customer support dialogs for Uber. Integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"Less than 25% of customers reported receiving inconsistent or inaccurate information from support agents.\"\n\nFormally:\n- Let P(x) = \"dialog x involves the customer reporting receiving inconsistent or inaccurate information from the support agent\"\n- The claim is: proportion({x | P(x)}) < 0.25\n\nThis is a straightforward proportion check with no negation requiring NNF transformation.\n\n## Step 2: Query Operators and Expressions\n\n- The claim is about the proportion of dialogs where customers reported receiving inconsistent or inaccurate information from support agents.\n- I need to:\n  1. `map()` each dialog to determine if the customer reported receiving inconsistent or inaccurate information from the agent (boolean).\n  2. `aggregate()` to compute the proportion.\n  3. `check()` that the proportion is less than 0.25.\n\nThe schema has `dialog` as the text field containing the customer support dialog. I'll use a `map()` with a prompt to identify whether the customer in the dialog reported receiving inconsistent or inaccurate information from the support agent.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the customer in the {dialog} reported receiving inconsistent or inaccurate information from the support agent\",\n            bool\n        ).alias(\"received_inconsistent_info\")\n    )\n    .aggregate(\n        [proportion(col(\"received_inconsistent_info\")).alias(\"inconsistent_info_prop\")]\n    )\n    .check(col(\"inconsistent_info_prop\") < 0.25)\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the customer in the {dialog} reported receiving inconsistent or inaccurate information from the support agent\",\n            bool\n        ).alias(\"received_inconsistent_info\")\n    )\n    .aggregate(\n        [proportion(col(\"received_inconsistent_info\")).alias(\"inconsistent_info_prop\")]\n    )\n    .check(col(\"inconsistent_info_prop\") < 0.25)\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 7611,
+        "output_token_count": 405,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.342028625018429
+  }
+}
