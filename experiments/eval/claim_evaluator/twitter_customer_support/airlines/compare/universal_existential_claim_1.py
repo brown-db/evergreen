@@ -29,7 +29,7 @@ class UniversalExistentialClaim1Evaluator(ClaimEvaluator):
             df.map(
                 prompt(
                     "Identify whether the {dialog} contains a customer complaint about "
-                    "the food provided on their flight",
+                    "the taste of the food provided on their flight",
                     bool,
                 ).alias("complains_about_food")
             )
@@ -58,8 +58,8 @@ if __name__ == "__main__":
     args = parse_claim_evaluator_args()
     claim_evaluator = UniversalExistentialClaim1Evaluator(
         name="universal_existential_claim_1",
-        claim="All airlines have customer complaints about the food provided on their "
-        "flight.",
+        claim="All airlines have customer complaints about the taste of the food "
+        "provided on their flight.",
         hints="",
         schema=DIALOG_WITH_COMPANY_SCHEMA,
         text_field_name="dialog",
