@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import uuid
 from typing import cast
@@ -67,14 +68,18 @@ def evaluate_claim(
     language_model: str,
 ) -> EvaluationResult:
     conn = load_snowflake_connection(CONNECTION_NAME)
-    api_key = f"pat/{conn['password']}"
-    api_base = f"https://{conn['account']}.snowflakecomputing.com"
+    api_base = f"https://{conn['account']}.snowflakecomputing.com/api/v2/cortex"
+    assert "ANTHROPIC_API_KEY" not in os.environ, (
+        "ANTHROPIC_API_KEY is set; litellm would send it as `x-api-key` and ignore "
+        "the Cortex bearer PAT (ANTHROPIC_AUTH_TOKEN). Unset it to use Cortex."
+    )
+    os.environ["ANTHROPIC_AUTH_TOKEN"] = conn["password"]
 
     root_lm = dspy.LM(
-        f"snowflake/{DEFAULT_LANGUAGE_MODEL}",
-        api_key=api_key,
+        f"anthropic/{DEFAULT_LANGUAGE_MODEL}",
         api_base=api_base,
         temperature=1.0,
+        max_tokens=16_384,
         cache=False,
     )
     dspy.configure(lm=root_lm, track_usage=True)  # type: ignore
@@ -101,10 +106,10 @@ def evaluate_claim(
     )
 
     sub_lm = dspy.LM(
-        f"snowflake/{language_model}",
-        api_key=api_key,
+        f"anthropic/{language_model}",
         api_base=api_base,
         temperature=0.0,
+        max_tokens=16_384,
         cache=False,
     )
     rlm = dspy.RLM(  # type: ignore
@@ -113,6 +118,7 @@ def evaluate_claim(
         max_llm_calls=5_000,
         sub_lm=sub_lm,
         tools=[retrieval_engine.retrieve],
+        verbose=True,
     )
 
     t0 = time.perf_counter()

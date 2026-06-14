@@ -2,7 +2,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import httpx
 import numpy as np
@@ -175,17 +175,22 @@ class RetrieveParams(BaseModel):
         description=(
             "Number of rows to retrieve. Can be up to the total "
             "row count for exhaustive search. Only the first "
-            "page_size rows are returned immediately; use "
-            "continue_reading to view the rest."
+            "page_size rows (max 50) are returned immediately; call "
+            "continue_reading repeatedly to view the rest."
         )
     )
-    page_size: int = Field(description="Number of retrieved rows to view immediately.")
+    page_size: Literal[10, 20, 30, 40, 50] = Field(
+        description="Number of retrieved rows to view immediately. "
+        "Must be one of 10, 20, 30, 40, 50 (max 50 per page); use "
+        "continue_reading to page through the rest."
+    )
 
 
 class ContinueReadingParams(BaseModel):
-    page_size: int = Field(
+    page_size: Literal[10, 20, 30, 40, 50] = Field(
         description="Number of rows to read next. Picks up from where "
-        "the last page ended. Calling retrieve again resets the cursor."
+        "the last page ended. Calling retrieve again resets the cursor. "
+        "Must be one of 10, 20, 30, 40, 50 (max 50 per page)."
     )
 
 

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from evergreen.data_frame import FilterMetrics, MapMetrics, QueryMetrics
@@ -10,7 +11,7 @@ class EvaluationResult:
     query_metrics: QueryMetrics
     filter_metrics: FilterMetrics | None
     map_metrics: MapMetrics | None
-    prov_tokens: dict[Token, bool]
+    prov_tokens: Mapping[Token, bool | None]
     reasoning: str | list[dict[str, object]] | None
 
     def to_dict(self) -> dict[str, object]:

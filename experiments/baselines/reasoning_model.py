@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 _TOKENIZER = tiktoken.get_encoding("cl100k_base")
 
 # Safety margin as percentage of context window due to token approximation
-_SAFETY_MARGIN_PERCENT = 0.10
+_SAFETY_MARGIN_PERCENT = 0.15
 
 # Cortex's max output tokens
 _MAX_OUTPUT_TOKENS = CortexLanguageModel.MAX_OUTPUT_TOKENS

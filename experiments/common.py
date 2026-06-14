@@ -90,10 +90,10 @@ def setup_logging(log_file: Path) -> None:
         logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     )
 
-    for logger_name in ("evergreen", "experiments"):
+    for logger_name in ("evergreen", "experiments", "dspy"):
         parent_logger = logging.getLogger(logger_name)
         parent_logger.handlers.clear()
-        parent_logger.setLevel(logging.DEBUG)
+        parent_logger.setLevel(logging.INFO if logger_name == "dspy" else logging.DEBUG)
         parent_logger.addHandler(handler)
 
 

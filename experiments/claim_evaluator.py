@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -236,68 +237,76 @@ class ClaimEvaluator(ABC):
         trial_count = args.trial_count
 
         if Implementation.BASE_RM in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_reasoning_model(language_model, trial_id)
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_reasoning_model(language_model, trial_id)
 
         if Implementation.RAG_AGENT in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_rag_agent(language_model, trial_id)
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_rag_agent(language_model, trial_id)
 
         if Implementation.RLM in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_rlm(language_model, trial_id)
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_rlm(language_model, trial_id)
 
         if Implementation.EVG_REF in impls:
             self.evaluate_reference_query(trial_id=0)
 
         if Implementation.EVG_OPT in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_optimized_query(
-                        Implementation.EVG_OPT,
-                        language_model,
-                        trial_id,
-                        use_reference_query=False,
-                    )
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_optimized_query(
+                    Implementation.EVG_OPT,
+                    language_model,
+                    trial_id,
+                    use_reference_query=False,
+                )
 
         if Implementation.EVG_UNOPT in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_unoptimized_query(
-                        Implementation.EVG_UNOPT,
-                        language_model,
-                        trial_id,
-                        use_reference_query=False,
-                    )
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_unoptimized_query(
+                    Implementation.EVG_UNOPT,
+                    language_model,
+                    trial_id,
+                    use_reference_query=False,
+                )
 
         if Implementation.EVG_OPT_REF_QUERY in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_optimized_query(
-                        Implementation.EVG_OPT_REF_QUERY,
-                        language_model,
-                        trial_id,
-                        use_reference_query=True,
-                    )
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_optimized_query(
+                    Implementation.EVG_OPT_REF_QUERY,
+                    language_model,
+                    trial_id,
+                    use_reference_query=True,
+                )
 
         if Implementation.EVG_UNOPT_REF_QUERY in impls:
-            for language_model in language_models:
-                for trial_id in range(trial_count):
-                    self.evaluate_unoptimized_query(
-                        Implementation.EVG_UNOPT_REF_QUERY,
-                        language_model,
-                        trial_id,
-                        use_reference_query=True,
-                    )
+            for language_model, trial_id in product(
+                language_models, range(trial_count)
+            ):
+                self.evaluate_unoptimized_query(
+                    Implementation.EVG_UNOPT_REF_QUERY,
+                    language_model,
+                    trial_id,
+                    use_reference_query=True,
+                )
 
-        for impl, _ in OPTIMIZATION_CONFIGS.items():
+        for impl in OPTIMIZATION_CONFIGS:
             if impl in impls:
-                for language_model in language_models:
-                    for trial_id in range(trial_count):
-                        self.evaluate_query_with_config(impl, language_model, trial_id)
+                for language_model, trial_id in product(
+                    language_models, range(trial_count)
+                ):
+                    self.evaluate_query_with_config(impl, language_model, trial_id)
 
         if args.eval_sim_filter:
             self.evaluate_sim_filter(trial_count)
@@ -595,8 +604,10 @@ class ClaimEvaluator(ABC):
         result = df.collect()
 
         if not use_reference_query:
-            verification_result = self._extract_verification_result(
-                result.rows, df.schema()
+            verification_result, provenance = (
+                self._extract_verification_result_and_provenance(
+                    result.rows, df.schema()
+                )
             )
             self._write_evaluation_result(
                 EvaluationResult(
@@ -604,7 +615,7 @@ class ClaimEvaluator(ABC):
                     query_metrics=result.metrics,
                     filter_metrics=None,
                     map_metrics=None,
-                    prov_tokens={},
+                    prov_tokens={token: None for token in provenance},
                     reasoning=None,
                 ),
                 impl,
@@ -678,20 +689,12 @@ class ClaimEvaluator(ABC):
         # `check` always appends the verdict as the final column.
         return len(schema.fields) - 1
 
-    def _extract_verification_result(self, rows: list[Row], schema: Schema) -> bool:
-        if len(rows) == 0:
-            return False
-        assert len(rows) == 1
-        verification_result = rows[0][self._verdict_index(schema)]
-        assert isinstance(verification_result, bool)
-        return verification_result
-
     def _extract_verification_result_and_provenance(
         self, rows: list[Row], schema: Schema
     ) -> tuple[bool, Monomial]:
-        verification_result = self._extract_verification_result(rows, schema)
-        if len(rows) == 0:
-            return verification_result, frozenset()
+        assert len(rows) == 1
+        verification_result = rows[0][self._verdict_index(schema)]
+        assert isinstance(verification_result, bool)
         monomials = rows[0].get_prov_monomials(self._verdict_index(schema))
         assert len(monomials) == 1
         return verification_result, monomials[0]

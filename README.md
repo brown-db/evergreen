@@ -83,20 +83,12 @@ uv run python -m experiments.scripts.run_claim_evaluators \
 uv run python -m experiments.scripts.run_claim_evaluators --compile
 
 uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls evg_opt \
+    --impls evg_opt evg_opt_ref_query \
     --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5 llama4-maverick llama4-scout llama3.1-8b
 
 uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls evg_unopt \
-    --lms claude-opus-4-6
-
-uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls evg_opt_ref_query \
-    --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5 llama4-maverick llama4-scout llama3.1-8b
-
-uv run python -m experiments.scripts.run_claim_evaluators \
-    --impls evg_unopt_ref_query \
-    --lms claude-opus-4-6
+    --impls evg_unopt evg_unopt_ref_query \
+    --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5
 
 uv run python -m experiments.scripts.run_claim_evaluators \
     --impls evg_abl_no_es evg_abl_no_rs evg_abl_no_ecs evg_abl_no_of evg_abl_no_sf evg_abl_no_pc \
