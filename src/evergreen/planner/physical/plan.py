@@ -142,11 +142,18 @@ class BatchedPhysicalPlan(PhysicalPlan, ABC):
         self._input.open()
 
     def next(self) -> Row | None:
-        while not self._buffer:
-            if self._input_exhausted:
-                return None
-            self._buffer = deque(self._process_batch())
-        return self._buffer.popleft()
+        while True:
+            while not self._buffer:
+                if self._input_exhausted:
+                    return None
+                self._buffer = deque(self._process_batch())
+            row = self._buffer.popleft()
+            # A skip predicate (e.g., a downstream group that early-stopped) may
+            # have become active after this row was buffered. Re-check at emit
+            # time so buffered rows of a now-skipped group are dropped instead of
+            # being delivered and mistaken for a new group.
+            if not self.should_skip(row, self.schema()):
+                return row
 
     def close(self) -> None:
         self._input.close()
@@ -632,6 +639,13 @@ class StreamAggregate(PhysicalPlan):
 
             accumulator_confidence_level = 1 - adjusted_alpha
 
+            # The alpha-spending budget can underflow (e.g., geometric decay with
+            # many groups), so 1 - adjusted_alpha rounds to 1.0 (alpha == 0). A
+            # confidence sequence is undefined there, so fall back to the existing
+            # "deterministic-only" mode instead of running a degenerate CS.
+            if accumulator_confidence_level >= 1.0:
+                accumulator_confidence_level = None
+
             logger.debug(
                 "aggregate confidence level allocation: "
                 "agg_exprs=[%s], "
@@ -639,7 +653,7 @@ class StreamAggregate(PhysicalPlan):
                 "confidence_level=%f, "
                 "num_agg_exprs_supporting_estimation=%d, "
                 "group_count=%d, "
-                "accumulator_confidence_level=%f",
+                "accumulator_confidence_level=%s",
                 ", ".join(str(expr) for expr in self._agg_exprs),
                 ", ".join(str(expr) for expr in self._group_exprs),
                 self._confidence_level,
