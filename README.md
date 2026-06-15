@@ -80,7 +80,7 @@ uv run python -m experiments.scripts.run_claim_evaluators \
 uv run python -m experiments.scripts.run_claim_evaluators \
     --impls evg_ref
 
-uv run python -m experiments.scripts.run_claim_evaluators --compile
+uv run mkdocs build && uv run python -m experiments.scripts.run_claim_evaluators --compile
 
 uv run python -m experiments.scripts.run_claim_evaluators \
     --impls evg_opt evg_opt_ref_query \
