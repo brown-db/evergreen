@@ -2,7 +2,6 @@ from pathlib import Path
 
 from evergreen.data_frame import DataFrame
 from evergreen.planner.logical.expr import (
-    Expr,
     col,
     count_if,
     prompt,
@@ -17,6 +16,18 @@ from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class OrdinalClaim2Evaluator(ClaimEvaluator):
+    NAME = "ordinal_claim_2"
+    CLAIM = (
+        "SouthwestAir has the second most customer support dialogs with "
+        "complaints about flight booking issues."
+    )
+    SCHEMA = DIALOG_WITH_COMPANY_SCHEMA
+    TEXT_FIELD_NAME = "dialog"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/twitter_customer_support/airlines/rank_2026-06-03_18-22-36.json"
+    )
+    CACHE_ID = "ordinal_claims_1_and_2"
+
     def reference_query(
         self,
         df: DataFrame,
@@ -52,23 +63,6 @@ class OrdinalClaim2Evaluator(ClaimEvaluator):
             .check(col("rank").eq(2))
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("has_booking_complaint"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = OrdinalClaim2Evaluator(
-        name="ordinal_claim_2",
-        claim="SouthwestAir has the second most customer support dialogs with "
-        "complaints about flight booking issues.",
-        hints="",
-        schema=DIALOG_WITH_COMPANY_SCHEMA,
-        text_field_name="dialog",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/rank_2026-06-03_18-22-36.json"
-        ),
-        random_seed=42,
-        cache_id="ordinal_claims_1_and_2",
-    )
-    claim_evaluator.evaluate(args)
+    OrdinalClaim2Evaluator().evaluate(parse_claim_evaluator_args())

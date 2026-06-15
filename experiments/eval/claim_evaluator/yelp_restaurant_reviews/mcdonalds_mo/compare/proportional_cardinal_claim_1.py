@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, count_if, prompt, proportion
+from evergreen.planner.logical.expr import col, count_if, prompt, proportion
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
@@ -12,6 +12,17 @@ from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
+    NAME = "proportional_cardinal_claim_1"
+    CLAIM = (
+        "Only a minority of McDonald's locations had multiple reports of "
+        "incorrect orders."
+    )
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -52,22 +63,6 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
             .check(col("prop_with_multiple_incorrect") < 0.5)
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("mentions_incorrect_order"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ProportionalCardinalClaim1Evaluator(
-        name="proportional_cardinal_claim_1",
-        claim="Only a minority of McDonald's locations had multiple reports of "
-        "incorrect orders.",
-        hints="",
-        schema=REVIEW_WITH_BUSINESS_SCHEMA,
-        text_field_name="text",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ProportionalCardinalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

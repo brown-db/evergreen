@@ -19,9 +19,9 @@ from evergreen.common.constants import (
 from evergreen.core.session_context import SessionContext
 from evergreen.data_frame import DataFrame
 from evergreen.model.config import CortexModelConfig
-from evergreen.planner.logical.expr import Expr
+from evergreen.planner.logical.expr import Alias, Expr, Prompt, col
 from evergreen.planner.logical.optimizer import InsertSimilarityFilter
-from evergreen.planner.logical.plan import Filter
+from evergreen.planner.logical.plan import Filter, LogicalPlan, Projection
 from evergreen.provenance import Monomial
 from evergreen.storage.row import Row
 from evergreen.storage.row_id import RowId
@@ -115,23 +115,17 @@ def parse_claim_evaluator_args() -> argparse.Namespace:
 
 
 class ClaimEvaluator(ABC):
-    def __init__(
-        self,
-        name: str,
-        claim: str,
-        hints: str,
-        schema: Schema,
-        text_field_name: str,
-        agg_result_path: Path,
-        random_seed: int,
-        cache_id: str | None = None,
-    ) -> None:
-        self._name = name
-        self._claim = claim
-        self._hints = hints
-        self._schema = schema
+    NAME: str
+    CLAIM: str
+    HINTS: str = ""
+    SCHEMA: Schema
+    TEXT_FIELD_NAME: str
+    AGG_RESULT_PATH: Path
+    RANDOM_SEED: int = 42
+    CACHE_ID: str | None = None
 
-        with open(agg_result_path) as f:
+    def __init__(self) -> None:
+        with open(self.AGG_RESULT_PATH) as f:
             agg_result = json.load(f)
 
         agg_metadata = agg_result["metadata"]
@@ -139,19 +133,15 @@ class ClaimEvaluator(ABC):
         self._dataset_path = agg_metadata["dataset_path"]
         self._agg_prompt = agg_metadata["prompt"]
 
-        self._text_field_name = text_field_name
-        self._random_seed = random_seed
-        self._cache_id = cache_id
-
-        dataset_dir_name = agg_result_path.parent.parent.name
-        dataset_name = agg_result_path.parent.name
+        dataset_dir_name = self.AGG_RESULT_PATH.parent.parent.name
+        dataset_name = self.AGG_RESULT_PATH.parent.name
 
         claim_subdir = (
             Path("claim_evaluator")
             / dataset_dir_name
             / dataset_name
             / agg_name
-            / self._name
+            / self.NAME
         )
         self._logs_dir = LOGS_DIR / claim_subdir
         self._results_dir = RESULTS_DIR / claim_subdir
@@ -176,12 +166,35 @@ class ClaimEvaluator(ABC):
     ) -> DataFrame:
         pass
 
-    @abstractmethod
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        pass
+    def _reference_plan(self) -> LogicalPlan:
+        df = SessionContext().read_rows([], self.SCHEMA)
+        return self.reference_query(
+            df, Implementation.EVG_REF, ENSEMBLE_LANGUAGE_MODELS, 0
+        ).logical_plan()
 
-    def filter_prompt_str(self) -> str | None:
-        return None
+    def _semantic_filter_prompt_str(self) -> str | None:
+        prompts = [
+            node.predicate.prompt_str
+            for node in self._reference_plan().walk()
+            if isinstance(node, Filter) and isinstance(node.predicate, Prompt)
+        ]
+        assert len(prompts) <= 1
+        return prompts[0] if prompts else None
+
+    def semantic_map_columns(self) -> tuple[Expr, ...]:
+        names: list[str] = []
+        for node in self._reference_plan().walk():
+            if isinstance(node, Projection):
+                for expr in node.exprs:
+                    if (
+                        isinstance(expr, Alias)
+                        and isinstance(expr.expr, Prompt)
+                        and expr.name not in names
+                    ):
+                        names.append(expr.name)
+        # `walk()` is top-down, so the outermost (last-applied) map is seen
+        # first; reverse to recover the order the maps appear in the query.
+        return tuple(col(name) for name in reversed(names))
 
     def _log_file_path(
         self,
@@ -322,16 +335,16 @@ class ClaimEvaluator(ABC):
 
             compiler = ClaimCompiler(language_model)
             result = compiler.compile(
-                self._agg_prompt, self._schema, self._claim, self._hints
+                self._agg_prompt, self.SCHEMA, self.CLAIM, self.HINTS
             )
 
             obj = {
                 "metadata": {
-                    "name": self._name,
+                    "name": self.NAME,
                     "timestamp": self._timestamp,
-                    "claim": self._claim,
-                    "hints": self._hints,
-                    "schema": self._schema.to_dict(),
+                    "claim": self.CLAIM,
+                    "hints": self.HINTS,
+                    "schema": self.SCHEMA.to_dict(),
                     "agg_prompt": self._agg_prompt,
                 },
                 "claim_compilation_result": result.to_dict(),
@@ -350,11 +363,11 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating reasoning model")
 
         evaluation_result = reasoning_model.evaluate_claim(
-            self._claim,
-            self._hints,
+            self.CLAIM,
+            self.HINTS,
             self._agg_prompt,
             self._dataset_path,
-            self._schema,
+            self.SCHEMA,
             language_model,
         )
 
@@ -372,12 +385,12 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating RAG model")
 
         evaluation_result = rag_agent.evaluate_claim(
-            self._claim,
-            self._hints,
+            self.CLAIM,
+            self.HINTS,
             self._agg_prompt,
             self._dataset_path,
-            self._schema,
-            self._text_field_name,
+            self.SCHEMA,
+            self.TEXT_FIELD_NAME,
             language_model,
         )
 
@@ -398,12 +411,12 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating RLM")
 
         evaluation_result = rlm.evaluate_claim(
-            self._claim,
-            self._hints,
+            self.CLAIM,
+            self.HINTS,
             self._agg_prompt,
             self._dataset_path,
-            self._schema,
-            self._text_field_name,
+            self.SCHEMA,
+            self.TEXT_FIELD_NAME,
             language_model,
         )
 
@@ -446,7 +459,7 @@ class ClaimEvaluator(ABC):
             )
             return
 
-        df = ctx.read_json(self._dataset_path, self._schema.key)
+        df = ctx.read_json(self._dataset_path, self.SCHEMA.key)
         df = self.reference_query(
             df, Implementation.EVG_REF, ENSEMBLE_LANGUAGE_MODELS, trial_id
         )
@@ -487,9 +500,9 @@ class ClaimEvaluator(ABC):
         logger.debug("Evaluating optimized query (%s)", impl.value)
 
         ctx = SessionContext.create_optimized(
-            random_seed=self._random_seed + trial_id,
-            cache_id=f"{self._cache_id}_{impl.value}_{language_model}_{trial_id}"
-            if self._cache_id
+            random_seed=self.RANDOM_SEED + trial_id,
+            cache_id=f"{self.CACHE_ID}_{impl.value}_{language_model}_{trial_id}"
+            if self.CACHE_ID
             else None,
         )
         ctx.register_model_config(
@@ -566,15 +579,15 @@ class ClaimEvaluator(ABC):
         if config.relevance_sort:
             ctx.enable_relevance_sort()
         if config.estimation:
-            ctx.enable_estimation(random_seed=self._random_seed + trial_id)
+            ctx.enable_estimation(random_seed=self.RANDOM_SEED + trial_id)
         if config.fusion:
             ctx.enable_fusion()
         if config.similarity_filter:
             ctx.enable_similarity_filter()
         if config.cache:
             ctx.enable_cache(
-                f"{self._cache_id}_{impl.value}_{language_model}_{trial_id}"
-                if self._cache_id
+                f"{self.CACHE_ID}_{impl.value}_{language_model}_{trial_id}"
+                if self.CACHE_ID
                 else None
             )
 
@@ -596,7 +609,7 @@ class ClaimEvaluator(ABC):
         trial_id: int,
         use_reference_query: bool,
     ) -> None:
-        df = ctx.read_json(self._dataset_path, self._schema.key)
+        df = ctx.read_json(self._dataset_path, self.SCHEMA.key)
         if use_reference_query:
             df = self.reference_query(df, impl, language_models, trial_id)
         else:
@@ -708,13 +721,13 @@ class ClaimEvaluator(ABC):
     ) -> None:
         results = {
             "metadata": {
-                "name": self._name,
+                "name": self.NAME,
                 "implementation": impl.value,
                 "timestamp": self._timestamp,
                 "trial_id": trial_id,
                 "dataset_path": self._dataset_path,
                 "log_file": str(self._log_file_path(impl, language_models, trial_id)),
-                "random_seed": self._random_seed,
+                "random_seed": self.RANDOM_SEED,
             },
             "evaluation_result": evaluation_result.to_dict(),
         }
@@ -725,7 +738,7 @@ class ClaimEvaluator(ABC):
             json.dump(results, f, indent=JSON_INDENT)
 
     def evaluate_sim_filter(self, trial_count: int) -> None:
-        filter_prompt_str = self.filter_prompt_str()
+        filter_prompt_str = self._semantic_filter_prompt_str()
         if filter_prompt_str is None:
             return
 
@@ -762,7 +775,7 @@ class ClaimEvaluator(ABC):
             assert query_vector is not None
             query_vectors.append(np.array(query_vector))
 
-        input_df = SessionContext().read_json(self._dataset_path, self._schema.key)
+        input_df = SessionContext().read_json(self._dataset_path, self.SCHEMA.key)
         input_rows = input_df.collect().rows
         input_schema = input_df.schema()
 
@@ -814,7 +827,7 @@ class ClaimEvaluator(ABC):
             json.dump(
                 {
                     "metadata": {
-                        "name": self._name,
+                        "name": self.NAME,
                         "dataset_path": self._dataset_path,
                         "filter_prompt": filter_prompt_str,
                     },

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,6 +29,12 @@ class LogicalPlan(ABC):
     @abstractmethod
     def schema(self) -> Schema:
         pass
+
+    def walk(self) -> Iterator[LogicalPlan]:
+        """Pre-order traversal of this plan and all of its descendants."""
+        yield self
+        for input in self.inputs():
+            yield from input.walk()
 
     def is_above(self, plan_type: type[LogicalPlan]) -> bool:
         return any(

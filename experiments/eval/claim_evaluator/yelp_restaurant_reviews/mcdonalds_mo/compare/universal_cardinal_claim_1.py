@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, bool_and, col, count_if, prompt
+from evergreen.planner.logical.expr import bool_and, col, count_if, prompt
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
@@ -12,6 +12,17 @@ from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class UniversalCardinalClaim1Evaluator(ClaimEvaluator):
+    NAME = "universal_cardinal_claim_1"
+    CLAIM = (
+        "All McDonald's locations have multiple complaints about poor service "
+        "quality."
+    )
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -48,22 +59,6 @@ class UniversalCardinalClaim1Evaluator(ClaimEvaluator):
             .check(col("all_have_multiple_complaints"))
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("complains_about_service"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = UniversalCardinalClaim1Evaluator(
-        name="universal_cardinal_claim_1",
-        claim="All McDonald's locations have multiple complaints about poor service "
-        "quality.",
-        hints="",
-        schema=REVIEW_WITH_BUSINESS_SCHEMA,
-        text_field_name="text",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    UniversalCardinalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

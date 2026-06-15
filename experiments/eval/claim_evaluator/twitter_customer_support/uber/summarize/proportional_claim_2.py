@@ -2,7 +2,6 @@ from pathlib import Path
 
 from evergreen.data_frame import DataFrame
 from evergreen.planner.logical.expr import (
-    Expr,
     col,
     prompt,
     proportion,
@@ -17,6 +16,17 @@ from experiments.schemas import DIALOG_SCHEMA
 
 
 class ProportionalClaim2Evaluator(ClaimEvaluator):
+    NAME = "proportional_claim_2"
+    CLAIM = (
+        "Less than 25% of customers reported receiving inconsistent or "
+        "inaccurate information from support agents."
+    )
+    SCHEMA = DIALOG_SCHEMA
+    TEXT_FIELD_NAME = "dialog"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/twitter_customer_support/uber/summarize_2026-06-01_14-04-38.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -50,22 +60,6 @@ class ProportionalClaim2Evaluator(ClaimEvaluator):
             .check(col("inconsistent_info_prop") < 0.25)
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("received_inconsistent_info"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ProportionalClaim2Evaluator(
-        name="proportional_claim_2",
-        claim="Less than 25% of customers reported receiving inconsistent or "
-        "inaccurate information from support agents.",
-        hints="",
-        schema=DIALOG_SCHEMA,
-        text_field_name="dialog",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/twitter_customer_support/uber/summarize_2026-06-01_14-04-38.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ProportionalClaim2Evaluator().evaluate(parse_claim_evaluator_args())

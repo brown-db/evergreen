@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, bool_or, col, prompt, proportion
+from evergreen.planner.logical.expr import bool_or, col, prompt, proportion
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
@@ -12,6 +12,14 @@ from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
+    NAME = "proportional_existential_claim_1"
+    CLAIM = "The majority of McDonald's locations had reports of cold food."
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -48,21 +56,6 @@ class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
             .check(col("prop_locations_with_cold_food") > 0.5)
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("mentions_cold_food"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ProportionalExistentialClaim1Evaluator(
-        name="proportional_existential_claim_1",
-        claim="The majority of McDonald's locations had reports of cold food.",
-        hints="",
-        schema=REVIEW_WITH_BUSINESS_SCHEMA,
-        text_field_name="text",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ProportionalExistentialClaim1Evaluator().evaluate(parse_claim_evaluator_args())

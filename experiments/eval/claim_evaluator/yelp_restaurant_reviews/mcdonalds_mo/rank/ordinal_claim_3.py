@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, prompt, proportion
+from evergreen.planner.logical.expr import col, prompt, proportion
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
@@ -12,6 +12,22 @@ from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class OrdinalClaim3Evaluator(ClaimEvaluator):
+    NAME = "ordinal_claim_3"
+    CLAIM = (
+        "The top-ranked McDonald's location in terms of service has the "
+        "Business ID 9eYm5gwEOhBQdkg9ihV7EA."
+    )
+    HINTS = (
+        "Rank based on, among the reviews that mention the service, the "
+        "proportion that speak positively about the service."
+    )
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/rank_2026-02-20_20-01-21.json"
+    )
+    CACHE_ID = "ordinal_claims_3_and_4"
+
     def reference_query(
         self,
         df: DataFrame,
@@ -55,29 +71,6 @@ class OrdinalClaim3Evaluator(ClaimEvaluator):
             .check(col("rank").eq(1))
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("praises_service"),)
-
-    def filter_prompt_str(self) -> str | None:
-        return "The restaurant review {text} describes the restaurant's service"
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = OrdinalClaim3Evaluator(
-        name="ordinal_claim_3",
-        claim="The top-ranked McDonald's location in terms of service has the "
-        "Business ID 9eYm5gwEOhBQdkg9ihV7EA.",
-        hints=(
-            "Rank based on, among the reviews that mention the service, the "
-            "proportion that speak positively about the service."
-        ),
-        schema=REVIEW_WITH_BUSINESS_SCHEMA,
-        text_field_name="text",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/rank_2026-02-20_20-01-21.json"
-        ),
-        random_seed=42,
-        cache_id="ordinal_claims_3_and_4",
-    )
-    claim_evaluator.evaluate(args)
+    OrdinalClaim3Evaluator().evaluate(parse_claim_evaluator_args())

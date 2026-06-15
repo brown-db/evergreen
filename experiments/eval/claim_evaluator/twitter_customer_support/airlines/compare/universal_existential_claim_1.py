@@ -2,7 +2,6 @@ from pathlib import Path
 
 from evergreen.data_frame import DataFrame
 from evergreen.planner.logical.expr import (
-    Expr,
     bool_and,
     bool_or,
     col,
@@ -18,6 +17,17 @@ from experiments.schemas import DIALOG_WITH_COMPANY_SCHEMA
 
 
 class UniversalExistentialClaim1Evaluator(ClaimEvaluator):
+    NAME = "universal_existential_claim_1"
+    CLAIM = (
+        "All airlines have customer complaints about the taste of the food "
+        "provided on their flight."
+    )
+    SCHEMA = DIALOG_WITH_COMPANY_SCHEMA
+    TEXT_FIELD_NAME = "dialog"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -51,22 +61,6 @@ class UniversalExistentialClaim1Evaluator(ClaimEvaluator):
             .check(col("all_have_food_complaints"))
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("complains_about_food"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = UniversalExistentialClaim1Evaluator(
-        name="universal_existential_claim_1",
-        claim="All airlines have customer complaints about the taste of the food "
-        "provided on their flight.",
-        hints="",
-        schema=DIALOG_WITH_COMPANY_SCHEMA,
-        text_field_name="dialog",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    UniversalExistentialClaim1Evaluator().evaluate(parse_claim_evaluator_args())

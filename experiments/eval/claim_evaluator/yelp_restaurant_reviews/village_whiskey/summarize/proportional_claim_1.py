@@ -2,7 +2,6 @@ from pathlib import Path
 
 from evergreen.data_frame import DataFrame
 from evergreen.planner.logical.expr import (
-    Expr,
     col,
     prompt,
     proportion,
@@ -17,6 +16,14 @@ from experiments.schemas import REVIEW_SCHEMA
 
 
 class ProportionalClaim1Evaluator(ClaimEvaluator):
+    NAME = "proportional_claim_1"
+    CLAIM = "Village Whiskey has received majority positive reviews."
+    SCHEMA = REVIEW_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -43,21 +50,6 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("positive_prop") > 0.5)
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("is_positive"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ProportionalClaim1Evaluator(
-        name="proportional_claim_1",
-        claim="Village Whiskey has received majority positive reviews.",
-        hints="",
-        schema=REVIEW_SCHEMA,
-        text_field_name="text",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ProportionalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

@@ -3,7 +3,6 @@ from pathlib import Path
 
 from evergreen.data_frame import DataFrame
 from evergreen.planner.logical.expr import (
-    Expr,
     bool_or,
     col,
     prompt,
@@ -26,6 +25,19 @@ class Satisfaction(Enum):
 
 
 class ExistentialProportionalClaim1Evaluator(ClaimEvaluator):
+    NAME = "existential_proportional_claim_1"
+    CLAIM = "The customer satisfaction for some airlines was a mixed bag."
+    HINTS = (
+        "Classify each dialog's satisfaction as positive, negative, mixed (both), "
+        "or neutral. An airline's satisfaction is a 'mixed bag' if at least 20% of "
+        "its dialogs are positive or mixed and at least 20% are negative or mixed."
+    )
+    SCHEMA = DIALOG_WITH_COMPANY_SCHEMA
+    TEXT_FIELD_NAME = "dialog"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
+    )
+
     def reference_query(
         self,
         df: DataFrame,
@@ -76,25 +88,6 @@ class ExistentialProportionalClaim1Evaluator(ClaimEvaluator):
             .check(col("some_mixed_bag"))
         )
 
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("satisfaction"),)
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ExistentialProportionalClaim1Evaluator(
-        name="existential_proportional_claim_1",
-        claim="The customer satisfaction for some airlines was a mixed bag.",
-        hints=(
-            "Classify each dialog's satisfaction as positive, negative, mixed (both), "
-            "or neutral. An airline's satisfaction is a 'mixed bag' if at least 20% of "
-            "its dialogs are positive or mixed and at least 20% are negative or mixed."
-        ),
-        schema=DIALOG_WITH_COMPANY_SCHEMA,
-        text_field_name="dialog",
-        agg_result_path=Path(
-            "experiments/results/semantic_aggregate/twitter_customer_support/airlines/compare_2026-06-01_14-04-34.json"
-        ),
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ExistentialProportionalClaim1Evaluator().evaluate(parse_claim_evaluator_args())
