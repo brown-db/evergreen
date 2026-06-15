@@ -27,9 +27,11 @@ class ExistentialUniversalClaim1Evaluator(ClaimEvaluator):
     ) -> DataFrame:
         return (
             df.map(
-                prompt("Identify whether the {text} is a negative review", bool).alias(
-                    "is_negative"
-                )
+                prompt(
+                    "Identify whether the restaurant review {text} expresses a "
+                    "negative sentiment towards the restaurant",
+                    bool,
+                ).alias("is_negative")
             )
             .log(
                 str(

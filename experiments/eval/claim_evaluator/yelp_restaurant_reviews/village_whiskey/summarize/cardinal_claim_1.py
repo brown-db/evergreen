@@ -22,8 +22,8 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} is from a vegetarian reviewer who "
-                    "enjoyed the restaurant's burgers",
+                    "Identify whether the restaurant review {text} is from a "
+                    "vegetarian reviewer who enjoyed the restaurant's burgers",
                     bool,
                 ).alias("vegetarian_enjoyed_burgers")
             )

@@ -22,8 +22,8 @@ class UniversalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} mentions vegan options at the "
-                    "restaurant",
+                    "Identify whether the restaurant review {text} mentions the "
+                    "restaurant's vegan options",
                     bool,
                 ).alias("mentions_vegan_options")
             )

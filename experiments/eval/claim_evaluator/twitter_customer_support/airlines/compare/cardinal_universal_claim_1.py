@@ -33,10 +33,13 @@ class CardinalUniversalClaim1Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .filter(prompt("The {dialog} contains a customer complaint"))
+            .filter(
+                prompt("The customer support {dialog} contains a customer complaint")
+            )
             .map(
                 prompt(
-                    "Identify whether the support agent apologizes in the {dialog}",
+                    "Identify whether the support agent apologizes in the customer "
+                    "support {dialog}",
                     bool,
                 ).alias("agent_apologizes")
             )
@@ -61,7 +64,7 @@ class CardinalUniversalClaim1Evaluator(ClaimEvaluator):
         return (col("agent_apologizes"),)
 
     def filter_prompt_str(self) -> str | None:
-        return "The {dialog} contains a customer complaint"
+        return "The customer support {dialog} contains a customer complaint"
 
 
 if __name__ == "__main__":

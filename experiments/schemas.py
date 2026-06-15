@@ -10,7 +10,7 @@ REVIEW_ID = Field("review_id", str, "The unique identifier of the customer revie
 BUSINESS_ID = Field(
     "business_id", str, "The unique identifier of the reviewed restaurant."
 )
-TEXT = Field("text", str, "The free-form text of a customer review.")
+TEXT = Field("text", str, "The customer review text.")
 
 DIALOG_SCHEMA = Schema((DIALOG_ID, DIALOG), key=("dialog_id",))
 

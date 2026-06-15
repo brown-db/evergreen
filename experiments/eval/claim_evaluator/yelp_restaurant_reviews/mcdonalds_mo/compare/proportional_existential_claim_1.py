@@ -22,9 +22,10 @@ class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} mentions or complains about cold food",
+                    "Identify whether the restaurant review {text} reports about "
+                    "cold food",
                     bool,
-                ).alias("mentions_cold_food")
+                ).alias("reports_cold_food")
             )
             .log(
                 str(
@@ -34,7 +35,7 @@ class ProportionalExistentialClaim1Evaluator(ClaimEvaluator):
                 )
             )
             .aggregate(
-                [bool_or(col("mentions_cold_food")).alias("has_cold_food_report")],
+                [bool_or(col("reports_cold_food")).alias("has_cold_food_report")],
                 group_by=[col("business_id")],
             )
             .aggregate(

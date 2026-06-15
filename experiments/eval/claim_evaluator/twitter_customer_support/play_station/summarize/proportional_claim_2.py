@@ -27,8 +27,8 @@ class ProportionalClaim2Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} involves a customer experiencing "
-                    "problems with payments or billing",
+                    "Identify whether the customer support {dialog} involves a "
+                    "customer experiencing problems with payments or billing",
                     bool,
                 ).alias("has_payment_billing_issue")
             )

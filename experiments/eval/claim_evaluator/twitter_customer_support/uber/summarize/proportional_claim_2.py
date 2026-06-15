@@ -27,8 +27,9 @@ class ProportionalClaim2Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} indicates a customer received "
-                    "inconsistent or inaccurate information from the support agent",
+                    "Identify whether the customer support {dialog} indicates that the "
+                    "customer received inconsistent or inaccurate information from the "
+                    "support agent",
                     bool,
                 ).alias("received_inconsistent_info")
             )

@@ -27,8 +27,8 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} involves a customer experiencing "
-                    "problems with their account or login issues",
+                    "Identify whether the customer support {dialog} involves a "
+                    "customer experiencing problems with their account or login issues",
                     bool,
                 ).alias("has_account_or_login_issue")
             )

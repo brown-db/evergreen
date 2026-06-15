@@ -28,8 +28,9 @@ class UniversalExistentialClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} contains a customer complaint about "
-                    "the taste of the food provided on their flight",
+                    "Identify whether the customer support {dialog} contains a "
+                    "customer complaint about the taste of the food provided on their "
+                    "flight",
                     bool,
                 ).alias("complains_about_food")
             )

@@ -27,11 +27,15 @@ class OrdinalClaim4Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .filter(prompt("The {text} mentions the service at the restaurant"))
+            .filter(
+                prompt(
+                    "The restaurant review {text} describes the restaurant's service"
+                )
+            )
             .map(
                 prompt(
-                    "Identify whether the {text} praises or speaks positively about "
-                    "the service at the restaurant",
+                    "Identify whether the restaurant review {text} praises the "
+                    "restaurant's service",
                     bool,
                 ).alias("praises_service")
             )
@@ -55,7 +59,7 @@ class OrdinalClaim4Evaluator(ClaimEvaluator):
         return (col("praises_service"),)
 
     def filter_prompt_str(self) -> str | None:
-        return "The {text} mentions the service at the restaurant"
+        return "The restaurant review {text} describes the restaurant's service"
 
 
 if __name__ == "__main__":

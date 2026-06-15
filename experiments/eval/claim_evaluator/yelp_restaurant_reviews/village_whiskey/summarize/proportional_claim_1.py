@@ -27,8 +27,8 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} expresses a positive sentiment "
-                    "towards the restaurant",
+                    "Identify whether the restaurant review {text} expresses a "
+                    "positive sentiment towards the restaurant",
                     bool,
                 ).alias("is_positive")
             )

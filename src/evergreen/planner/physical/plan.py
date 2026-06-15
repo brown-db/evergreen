@@ -336,13 +336,15 @@ class FusedFilterProjection(BatchedPhysicalPlan):
             )
 
     @staticmethod
-    def _merge_field_indices(prompts: list[Prompt]) -> tuple[tuple[str, int], ...]:
-        field_indices: list[tuple[str, int]] = []
+    def _merge_field_indices(
+        prompts: list[Prompt],
+    ) -> tuple[tuple[str, int, str | None], ...]:
+        field_indices: list[tuple[str, int, str | None]] = []
         seen: set[str] = set()
         for prompt in prompts:
-            for field_name, index in prompt.field_indices():
+            for field_name, index, description in prompt.field_indices():
                 if field_name not in seen:
-                    field_indices.append((field_name, index))
+                    field_indices.append((field_name, index, description))
                     seen.add(field_name)
         return tuple(field_indices)
 

@@ -22,8 +22,8 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} expresses enjoyment of the "
-                    "restaurant's calamari",
+                    "Identify whether the restaurant review {text} expresses "
+                    "enjoyment of the restaurant's calamari",
                     bool,
                 ).alias("enjoys_calamari")
             )

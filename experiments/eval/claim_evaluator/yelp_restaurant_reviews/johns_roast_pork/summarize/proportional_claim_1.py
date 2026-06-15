@@ -32,13 +32,18 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .filter(prompt("The {text} expresses a criticism or complaint"))
+            .filter(
+                prompt(
+                    "The restaurant review {text} expresses a complaint about the "
+                    "restaurant"
+                )
+            )
             .map(
                 prompt(
-                    "Identify whether the {text} criticizes or complains about a "
-                    "cash-only policy",
+                    "Identify whether the restaurant review {text} complains about the "
+                    "restaurant's cash-only policy",
                     bool,
-                ).alias("criticizes_cash_only")
+                ).alias("complains_about_cash_only")
             )
             .log(
                 str(
@@ -49,19 +54,19 @@ class ProportionalClaim1Evaluator(ClaimEvaluator):
             )
             .aggregate(
                 [
-                    proportion(col("criticizes_cash_only")).alias(
-                        "cash_only_criticism_prop"
+                    proportion(col("complains_about_cash_only")).alias(
+                        "cash_only_complaint_prop"
                     )
                 ]
             )
-            .check(col("cash_only_criticism_prop") >= 0.1)
+            .check(col("cash_only_complaint_prop") >= 0.1)
         )
 
     def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("criticizes_cash_only"),)
+        return (col("complains_about_cash_only"),)
 
     def filter_prompt_str(self) -> str | None:
-        return "The {text} expresses a criticism or complaint"
+        return "The restaurant review {text} expresses a complaint about the restaurant"
 
 
 if __name__ == "__main__":

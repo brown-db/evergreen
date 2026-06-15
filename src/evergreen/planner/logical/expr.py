@@ -50,7 +50,10 @@ class Expr(ABC):
         Examples:
             Name a computed column:
 
-            >>> prompt("Identify the sentiment of the {review}", str).alias("sentiment")
+            >>> prompt(
+            ...     "Identify whether the movie {review} describes the movie's "
+            ...     "soundtrack", bool
+            ... ).alias("describes_soundtrack")
         """
         return Alias(self, name)
 
@@ -333,11 +336,15 @@ def prompt(prompt_str: str, return_type: type[object] = bool) -> Prompt:
     Examples:
         Boolean predicate prompt:
 
-        >>> df.filter(prompt("The {review} mentions the movie's cinematography"))
+        >>> df.filter(prompt("The movie {review} mentions the movie's cinematography"))
 
         Extraction prompt:
 
-        >>> df.map(prompt("Extract the main topic of the {review}", str).alias("topic"))
+        >>> df.map(
+        ...     prompt(
+        ...         "Extract the main topic of the movie {review}", str
+        ...     ).alias("topic")
+        ... )
 
         Classification prompt:
 
@@ -348,7 +355,8 @@ def prompt(prompt_str: str, return_type: type[object] = bool) -> Prompt:
         ...     NEUTRAL = "neutral"
         >>> df.map(
         ...     prompt(
-        ...         "Identify the sentiment of the {review}", Sentiment
+        ...         "Identify the sentiment of the movie {review} towards the movie",
+        ...         Sentiment
         ...     ).alias("sentiment")
         ... )
     """

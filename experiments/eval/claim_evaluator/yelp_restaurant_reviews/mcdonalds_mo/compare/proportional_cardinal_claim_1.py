@@ -22,9 +22,10 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} mentions an incorrect order",
+                    "Identify whether the restaurant review {text} reports an "
+                    "incorrect order",
                     bool,
-                ).alias("mentions_incorrect_order")
+                ).alias("reports_incorrect_order")
             )
             .log(
                 str(
@@ -35,7 +36,7 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
             )
             .aggregate(
                 [
-                    count_if(col("mentions_incorrect_order")).alias(
+                    count_if(col("reports_incorrect_order")).alias(
                         "incorrect_order_count"
                     )
                 ],

@@ -27,8 +27,8 @@ class OrdinalClaim4Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {dialog} contains a customer complaint about "
-                    "flight booking issues",
+                    "Identify whether the customer support {dialog} contains a "
+                    "customer complaint about flight booking issues",
                     bool,
                 ).alias("has_booking_complaint")
             )

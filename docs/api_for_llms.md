@@ -39,7 +39,7 @@ Check if some movie reviews mention beautiful cinematography:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} mentions beautiful cinematography", bool
+...             "Identify whether the movie {review} mentions the movie's beautiful cinematography", bool
 ...         ).alias("mentions_beautiful_cinematography")
 ...     )
 ...     .aggregate(
@@ -55,7 +55,7 @@ Check if all movies have majority positive reviews:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} has a positive sentiment towards the movie", bool
+...             "Identify whether the movie {review} has a positive sentiment towards the movie", bool
 ...         ).alias("is_positive")
 ...     )
 ...     .aggregate(
@@ -74,11 +74,11 @@ Check if excessive violence is a frequent complaint for multiple movies:
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions a complaint towards the movie")
+...         prompt("The movie {review} contains a complaint towards the movie")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review}'s complaint is about excessive violence", bool
+...             "Identify whether the movie {review}'s complaint is about the movie's excessive violence", bool
 ...         ).alias("about_violence")
 ...     )
 ...     .aggregate(
@@ -98,7 +98,7 @@ Check if 10% of reviews praise the movie's sound effects:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} praises the movie's sound effects", bool
+...             "Identify whether the movie {review} praises the movie's sound effects", bool
 ...         ).alias("praises_sound_effects")
 ...     )
 ...     .aggregate(
@@ -113,11 +113,11 @@ Check if Bob Smith wrote the soundtrack for the movie:
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions the writer of the movie's soundtrack")
+...         prompt("The movie {review} mentions the writer of the movie's soundtrack")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review} says that the writer of the movie's soundtrack is Bob Smith", bool
+...             "Identify whether the movie {review} says that the writer of the movie's soundtrack is Bob Smith", bool
 ...         ).alias("is_bob_smith")
 ...     )
 ...     .aggregate(
@@ -138,7 +138,7 @@ Check if some movies received mixed reviews:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify the sentiment of the {review} as positive (mostly favorable), "
+...             "Identify the sentiment of the movie {review} towards the movie as positive (mostly favorable), "
 ...             "negative (mostly unfavorable), mixed (both favorable and unfavorable), "
 ...             "or neutral (neither)", Sentiment
 ...         ).alias("sentiment")
@@ -160,11 +160,11 @@ Check if Interstellar has the most highly rated soundtrack among all the movie r
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions the movie's soundtrack")
+...         prompt("The movie {review} mentions the movie's soundtrack")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review} praises the movie's soundtrack", bool
+...             "Identify whether the movie {review} praises the movie's soundtrack", bool
 ...         ).alias("praises_soundtrack")
 ...     )
 ...     .aggregate(
@@ -183,7 +183,7 @@ Check if Coco has the second highest number of praises among all the movie revie
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} praises the movie", bool
+...             "Identify whether the movie {review} praises the movie", bool
 ...         ).alias("praises_movie")
 ...     )
 ...     .aggregate(
@@ -203,7 +203,7 @@ Check if none of the movie reviews complain about the visual effects
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} complains about the visual effects", bool
+...             "Identify whether the movie {review} complains about the movie's visual effects", bool
 ...         ).alias("complains_about_vfx")
 ...     )
 ...     .aggregate([bool_and(~col("complains_about_vfx")).alias("all_no_complaints")])

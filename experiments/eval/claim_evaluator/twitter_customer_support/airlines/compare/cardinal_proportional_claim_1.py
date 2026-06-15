@@ -33,11 +33,13 @@ class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .filter(prompt("The {dialog} contains a customer complaint"))
+            .filter(
+                prompt("The customer support {dialog} contains a customer complaint")
+            )
             .map(
                 prompt(
-                    "Identify whether the {dialog} contains a customer complaint "
-                    "regarding flight delays",
+                    "Identify whether the customer support {dialog} contains a "
+                    "customer complaint regarding flight delays",
                     bool,
                 ).alias("about_flight_delays")
             )
@@ -66,7 +68,7 @@ class CardinalProportionalClaim1Evaluator(ClaimEvaluator):
         return (col("about_flight_delays"),)
 
     def filter_prompt_str(self) -> str | None:
-        return "The {dialog} contains a customer complaint"
+        return "The customer support {dialog} contains a customer complaint"
 
 
 if __name__ == "__main__":

@@ -28,12 +28,15 @@ class UniversalClaim1Evaluator(ClaimEvaluator):
                 )
             )
             .filter(
-                prompt("The {text} mentions the number of whiskey varieties available")
+                prompt(
+                    "The restaurant review {text} mentions the number of whiskey "
+                    "varieties available"
+                )
             )
             .map(
                 prompt(
-                    "Identify whether the {text} indicates that there are over 200 "
-                    "varieties of whiskey available",
+                    "Identify whether the restaurant review {text} indicates that "
+                    "there are over 200 varieties of whiskey available",
                     bool,
                 ).alias("indicates_over_200")
             )
@@ -54,7 +57,10 @@ class UniversalClaim1Evaluator(ClaimEvaluator):
         return (col("indicates_over_200"),)
 
     def filter_prompt_str(self) -> str | None:
-        return "The {text} mentions the number of whiskey varieties available"
+        return (
+            "The restaurant review {text} mentions the number of whiskey varieties "
+            "available"
+        )
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ Think step by step and output your reasoning for each step below:
     constants, variables, predicates, functions, quantifiers, etc.
   - If negation is present, rewrite the <claim> in negation normal form (NNF) by
     using De Morgan's laws to push negation inwards such that they only apply to
-    atomic predicates. You must use rewritten <claim> in NNF instead of the original
+    atomic predicates. You must use the rewritten <claim> in NNF instead of the original
     <claim> in the following steps for constructing the semantic verification query.
   - If provided, use the <hints> below for clarification.
 2. Based on the provided <api_reference> and <schema>,
@@ -44,11 +44,16 @@ Think step by step and output your reasoning for each step below:
      quantity relative to a sub-population, `filter()` to that sub-population first so
      it forms the base (denominator) of the subsequent aggregate.
    - `map()` can be used to label tuples with extracted features. To count tuples or
-     compute the proportion of tuples that exhibit a *semantic* feature, label the
-     feature as an explicit boolean column with `map(prompt(..., bool))` and then
-     aggregate that column with `count_if()` or `proportion()`. Do not instead
-     `filter()` on the feature and count the surviving tuples (e.g.,
-     `count_if(lit(True))`); the semantic feature must be its own column. When a tuple
+     compute the proportion of tuples that exhibit a *semantic* feature, you must
+     label the feature as an explicit boolean column with `map(prompt(..., bool))`
+     and then aggregate that column with `count_if()` or `proportion()`. Never
+     instead `filter()` on the feature and count the surviving tuples (e.g., with
+     `count_if(lit(True))`); the semantic feature must always be materialized as its
+     own column via `map(prompt(...))`, even when that same feature defines the
+     population being ranked or compared. Because `map(prompt(...))` labels one tuple
+     at a time, frame the feature as a property of that single tuple rather than of a
+     set of tuples; this concerns only how the tuple is referenced, not the wording
+     or grammatical number of the topic the feature is about. When a tuple
      should be counted only if it satisfies several conditions at once, fold those
      conditions into a single `map(prompt(..., bool))` rather than chaining a
      `filter()` and a `map()`. For a categorical feature with more than two possible
@@ -66,11 +71,22 @@ Think step by step and output your reasoning for each step below:
    - `with_rank()` can be used to rank groups according to computed quantities.
      This ranking can be used for comparisons between groups.
    - `check()` can be used to verify the final predicate.
-   When writing the `prompt()` text for a `filter()` or `map()`, do not reference the
+   When writing the `prompt()` text for a `filter()` or `map()`, never use the
    dataset's specific entity name (e.g., a particular business, product, or person);
-   that name is already implied by the <agg_prompt> and <schema>. You may, however,
-   refer to the generic entity type or scope (e.g., "the business") when it
-   makes the feature being extracted clearer.
+   it is already implied by the <agg_prompt> and <schema>. Instead, anchor the feature
+   to the generic entity type or scope (e.g., "the movie", "the business") so each
+   `prompt()` is self-contained. Base the wording only on the feature being measured,
+   as described by the <agg_prompt> and <hints>, keeping its noun phrasing — including
+   the grammatical number of any topic, category, or aspect named there — exactly as
+   written rather than paraphrasing it, and write an entity's attribute in the
+   possessive form. Match the `prompt()` text to its operator and return type:
+   a `filter()` predicate reads as a declarative statement
+   (e.g., "The movie review {{text}} mentions ...");
+   a `map(prompt(..., bool))` reads as a yes/no determination
+   (e.g., "Identify whether the movie review {{text}} mentions ...");
+   and a `map(prompt(..., SomeEnum))` reads as a request to assign one of the enum's
+   values (e.g., "Identify the sentiment of the movie review {{text}} as one of
+   <the values>").
 3. Output the semantic verification query.
    - You can assume that a DataFrame is available with the name `df`.
    - `df` already has the specified schema.

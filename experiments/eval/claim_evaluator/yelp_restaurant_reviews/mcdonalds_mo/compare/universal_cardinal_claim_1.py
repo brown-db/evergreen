@@ -22,8 +22,8 @@ class UniversalCardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} is a complaint about poor service "
-                    "quality",
+                    "Identify whether the restaurant review {text} complains "
+                    "about the restaurant's poor service quality",
                     bool,
                 ).alias("complains_about_service")
             )
