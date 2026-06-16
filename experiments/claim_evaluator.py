@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import logging
@@ -94,6 +96,31 @@ class CheckpointType(Enum):
     POST_SEM_OP = "post_sem_op"
 
 
+class SemanticOperatorKind(Enum):
+    FILTER = "filter"
+    MAP = "map"
+
+
+@dataclass(frozen=True)
+class SemanticOperator:
+    kind: SemanticOperatorKind
+    prompt_str: str
+    return_type: type[object]
+    alias: str | None
+
+    @classmethod
+    def filter(cls, prompt: Prompt) -> SemanticOperator:
+        return cls(
+            SemanticOperatorKind.FILTER, prompt.prompt_str, prompt.return_type, None
+        )
+
+    @classmethod
+    def map(cls, prompt: Prompt, alias: str) -> SemanticOperator:
+        return cls(
+            SemanticOperatorKind.MAP, prompt.prompt_str, prompt.return_type, alias
+        )
+
+
 def parse_claim_evaluator_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -149,11 +176,8 @@ class ClaimEvaluator(ABC):
 
         self._timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
 
-        self._post_sem_op_reference_df_path = self._checkpoint_df_path(
-            CheckpointType.POST_SEM_OP,
-            Implementation.EVG_REF,
-            ENSEMBLE_LANGUAGE_MODELS,
-            trial_id=0,
+        self._post_sem_op_reference_df_path = self.reference_checkpoint_path(
+            CheckpointType.POST_SEM_OP
         )
 
     @abstractmethod
@@ -172,29 +196,38 @@ class ClaimEvaluator(ABC):
             df, Implementation.EVG_REF, ENSEMBLE_LANGUAGE_MODELS, 0
         ).logical_plan()
 
+    def semantic_operators(self) -> tuple[SemanticOperator, ...]:
+        ops: list[SemanticOperator] = []
+        seen_map_aliases: set[str] = set()
+        for node in self._reference_plan().walk():
+            if isinstance(node, Filter) and isinstance(node.predicate, Prompt):
+                ops.append(SemanticOperator.filter(node.predicate))
+            elif isinstance(node, Projection):
+                for expr in node.exprs:
+                    if (
+                        isinstance(expr, Alias)
+                        and isinstance(expr.expr, Prompt)
+                        and expr.name not in seen_map_aliases
+                    ):
+                        seen_map_aliases.add(expr.name)
+                        ops.append(SemanticOperator.map(expr.expr, expr.name))
+        # `walk()` is top-down, so the outermost (last-applied) operator is seen
+        # first; reverse to recover the order operators appear in the query.
+        return tuple(reversed(ops))
+
     def _semantic_filter_prompt_str(self) -> str | None:
         prompts = [
-            node.predicate.prompt_str
-            for node in self._reference_plan().walk()
-            if isinstance(node, Filter) and isinstance(node.predicate, Prompt)
+            op.prompt_str
+            for op in self.semantic_operators()
+            if op.kind is SemanticOperatorKind.FILTER
         ]
         assert len(prompts) <= 1
         return prompts[0] if prompts else None
 
     def semantic_map_columns(self) -> tuple[Expr, ...]:
-        names: list[str] = []
-        for node in self._reference_plan().walk():
-            if isinstance(node, Projection):
-                for expr in node.exprs:
-                    if (
-                        isinstance(expr, Alias)
-                        and isinstance(expr.expr, Prompt)
-                        and expr.name not in names
-                    ):
-                        names.append(expr.name)
-        # `walk()` is top-down, so the outermost (last-applied) map is seen
-        # first; reverse to recover the order the maps appear in the query.
-        return tuple(col(name) for name in reversed(names))
+        return tuple(
+            col(op.alias) for op in self.semantic_operators() if op.alias is not None
+        )
 
     def _log_file_path(
         self,
@@ -217,6 +250,18 @@ class ClaimEvaluator(ABC):
         return (
             self._checkpoints_dir / f"{checkpoint_type.value}_{impl.value}"
             f"_{'_'.join(language_models)}_{trial_id}.pkl"
+        )
+
+    @property
+    def dataset_path(self) -> str:
+        return self._dataset_path
+
+    def reference_checkpoint_path(self, checkpoint_type: CheckpointType) -> Path:
+        return self._checkpoint_df_path(
+            checkpoint_type,
+            Implementation.EVG_REF,
+            ENSEMBLE_LANGUAGE_MODELS,
+            trial_id=0,
         )
 
     def _results_file_path(
