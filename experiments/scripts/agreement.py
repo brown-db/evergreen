@@ -35,6 +35,7 @@ import importlib
 import inspect
 import json
 import math
+import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
@@ -98,12 +99,21 @@ def label_value(label: object) -> object:
 
 
 def _import_all_evaluator_modules() -> None:
-    """Import every claim-evaluator module so its subclass is registered."""
+    """Import every claim-evaluator module so its subclass is registered.
+
+    Checkpoints are pickled while each evaluator runs as `__main__`, so any
+    enum defined in a claim file (e.g. a categorical map's return type) is
+    stored as `__main__.<Enum>`. Mirror those enums into this process's
+    `__main__` so `read_pickle` can resolve them.
+    """
+    main_module = sys.modules["__main__"]
     for path in sorted(CLAIM_EVALUATOR_DIR.rglob("*.py")):
         if "__pycache__" in str(path):
             continue
-        module = str(path).replace("/", ".").removesuffix(".py")
-        importlib.import_module(module)
+        mod = importlib.import_module(str(path).replace("/", ".").removesuffix(".py"))
+        for name, obj in vars(mod).items():
+            if isinstance(obj, type) and issubclass(obj, Enum):
+                setattr(main_module, name, obj)
 
 
 def all_evaluator_classes() -> list[type[ClaimEvaluator]]:
