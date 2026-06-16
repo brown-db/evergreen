@@ -17,7 +17,7 @@ from experiments.schemas import DIALOG_SCHEMA
 
 class CardinalClaim1Evaluator(ClaimEvaluator):
     NAME = "cardinal_claim_1"
-    CLAIM = "785 customers complained about poor driver behavior."
+    CLAIM = "776 customers complained about poor driver behavior."
     SCHEMA = DIALOG_SCHEMA
     TEXT_FIELD_NAME = "dialog"
     AGG_RESULT_PATH = Path(
@@ -53,7 +53,7 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
                     )
                 ]
             )
-            .check(col("poor_driver_complaint_count").eq(785))
+            .check(col("poor_driver_complaint_count").eq(776))
         )
 
 
