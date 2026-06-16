@@ -67,7 +67,7 @@ class OrdinalClaim3Evaluator(ClaimEvaluator):
                 group_by=[col("business_id")],
             )
             .with_rank(col("service_praise_prop"))
-            .filter(col("business_id").eq("9eYm5gwEOhBQdkg9ihV7EA"))
+            .filter(col("business_id").eq("oLV14RPXy_gCS9gvlAofSg"))
             .check(col("rank").eq(1))
         )
 
