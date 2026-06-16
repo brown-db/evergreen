@@ -374,11 +374,11 @@ def _cmd_build() -> None:
                 }
             )
 
-    # Sort by task_id so presentation order carries no label signal: the
-    # task_id suffix is a hash of the row, independent of the ensemble label,
-    # whereas the sampling order is label-interleaved (would leak the answer).
-    tasks.sort(key=lambda t: str(t["task_id"]))
-    keys.sort(key=lambda k: str(k["task_id"]))
+    def _presentation_key(task_id: object) -> str:
+        return hashlib.md5(str(task_id).encode()).hexdigest()
+
+    tasks.sort(key=lambda t: _presentation_key(t["task_id"]))
+    keys.sort(key=lambda k: _presentation_key(k["task_id"]))
 
     selected_ids = {task["task_id"] for task in tasks}
     dropped = sorted(
