@@ -15,7 +15,7 @@ class OrdinalClaim3Evaluator(ClaimEvaluator):
     NAME = "ordinal_claim_3"
     CLAIM = (
         "The top-ranked McDonald's location in terms of service has the "
-        "Business ID 9eYm5gwEOhBQdkg9ihV7EA."
+        "Business ID oLV14RPXy_gCS9gvlAofSg."
     )
     HINTS = (
         "Rank based on, among the reviews that mention the service, the "

@@ -15,7 +15,7 @@ class OrdinalClaim2Evaluator(ClaimEvaluator):
     NAME = "ordinal_claim_2"
     CLAIM = (
         "The McDonald's location ranked #2 in terms of service has the "
-        "Business ID 9eYm5gwEOhBQdkg9ihV7EA."
+        "Business ID oLV14RPXy_gCS9gvlAofSg."
     )
     HINTS = (
         "Rank based on, among the reviews that mention the service, the "
@@ -67,7 +67,7 @@ class OrdinalClaim2Evaluator(ClaimEvaluator):
                 group_by=[col("business_id")],
             )
             .with_rank(col("service_praise_prop"))
-            .filter(col("business_id").eq("9eYm5gwEOhBQdkg9ihV7EA"))
+            .filter(col("business_id").eq("oLV14RPXy_gCS9gvlAofSg"))
             .check(col("rank").eq(2))
         )
 
