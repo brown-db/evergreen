@@ -358,8 +358,6 @@ def _cmd_build() -> None:
             tasks.append(
                 {
                     "task_id": task_id,
-                    "operator_id": op.operator_id,
-                    "kind": op.kind.value,
                     "prompt": op.prompt_str,
                     "text": candidate.text,
                     "label_space": label_space(op.return_type),
@@ -370,10 +368,17 @@ def _cmd_build() -> None:
                 {
                     "task_id": task_id,
                     "operator_id": op.operator_id,
+                    "kind": op.kind.value,
                     "ensemble_label": candidate.ensemble_label,
                     "row_id": list(candidate.row_id),
                 }
             )
+
+    # Sort by task_id so presentation order carries no label signal: the
+    # task_id suffix is a hash of the row, independent of the ensemble label,
+    # whereas the sampling order is label-interleaved (would leak the answer).
+    tasks.sort(key=lambda t: str(t["task_id"]))
+    keys.sort(key=lambda k: str(k["task_id"]))
 
     selected_ids = {task["task_id"] for task in tasks}
     dropped = sorted(
@@ -510,10 +515,7 @@ def _cmd_score() -> None:
         )
 
     tasks = json.loads(tasks_path.read_text())
-    ensemble_by_id = {
-        entry["task_id"]: entry["ensemble_label"]
-        for entry in json.loads(key_path.read_text())
-    }
+    key_by_id = {entry["task_id"]: entry for entry in json.loads(key_path.read_text())}
 
     scored: list[_ScoredTask] = []
     unlabeled = 0
@@ -522,15 +524,16 @@ def _cmd_score() -> None:
         if task.get("human_label") is None:
             unlabeled += 1
             continue
-        if task["task_id"] not in ensemble_by_id:
+        key_entry = key_by_id.get(task["task_id"])
+        if key_entry is None:
             orphan += 1
             continue
         scored.append(
             _ScoredTask(
-                operator_id=task["operator_id"],
-                kind=task["kind"],
+                operator_id=key_entry["operator_id"],
+                kind=key_entry["kind"],
                 human=task["human_label"],
-                ensemble=ensemble_by_id[task["task_id"]],
+                ensemble=key_entry["ensemble_label"],
             )
         )
 
