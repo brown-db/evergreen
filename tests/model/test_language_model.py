@@ -20,6 +20,9 @@ class TestCortexLanguageModel:
                 "claude-opus-4-8",
                 "openai-gpt-5.5",
                 "gemini-3.5-flash",
+                "qwen3-vl-235b-a22b",
+                "qwen3-next-80b-a3b",
+                "llama3.1-8b",
             ],
         ],
     )

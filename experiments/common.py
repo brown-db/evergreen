@@ -9,6 +9,8 @@ EVALUATION_LANGUAGE_MODELS = (
     "claude-opus-4-6",
     "claude-sonnet-4-6",
     "claude-haiku-4-5",
+    "qwen3-vl-235b-a22b",
+    "qwen3-next-80b-a3b",
     "llama4-maverick",
     "llama4-scout",
     "llama3.1-8b",
@@ -54,6 +56,10 @@ MODEL_PRICING = {
         "cache_write": 1.25,
         "cache_read": 0.10,
     },
+    # source (6/16/2026): https://openrouter.ai/qwen/qwen3-vl-235b-a22b-instruct
+    "qwen3-vl-235b-a22b": {"input": 0.2, "output": 0.88},
+    # source (6/16/2026): https://openrouter.ai/qwen/qwen3-next-80b-a3b-instruct#providers
+    "qwen3-next-80b-a3b": {"input": 0.09, "output": 1.10},
     # source: https://groq.com/pricing
     "llama4-maverick": {"input": 0.20, "output": 0.60},
     "llama4-scout": {"input": 0.11, "output": 0.34},
