@@ -350,6 +350,7 @@ def evaluate_claim(
         base_url=f"https://{conn['account']}.snowflakecomputing.com/api/v2/cortex",
         http_client=httpx.Client(headers={"Authorization": f"Bearer {pat}"}),
         default_headers={"Authorization": f"Bearer {pat}"},
+        max_retries=10,
     )
 
     model_config = CortexModelConfig(
