@@ -84,7 +84,7 @@ uv run mkdocs build && uv run python -m experiments.scripts.run_claim_evaluators
 
 uv run python -m experiments.scripts.run_claim_evaluators \
     --impls evg_opt evg_opt_ref_query \
-    --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5 llama4-maverick llama4-scout llama3.1-8b
+    --lms claude-opus-4-6 claude-sonnet-4-6 claude-haiku-4-5 qwen3-vl-235b-a22b qwen3-next-80b-a3b
 
 uv run python -m experiments.scripts.run_claim_evaluators \
     --impls evg_unopt evg_unopt_ref_query \
