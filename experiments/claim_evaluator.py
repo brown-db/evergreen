@@ -161,12 +161,12 @@ class ClaimEvaluator(ABC):
         self._agg_prompt = agg_metadata["prompt"]
 
         dataset_dir_name = self.AGG_RESULT_PATH.parent.parent.name
-        dataset_name = self.AGG_RESULT_PATH.parent.name
+        self._dataset_name = self.AGG_RESULT_PATH.parent.name
 
         claim_subdir = (
             Path("claim_evaluator")
             / dataset_dir_name
-            / dataset_name
+            / self._dataset_name
             / agg_name
             / self.NAME
         )
@@ -546,7 +546,7 @@ class ClaimEvaluator(ABC):
 
         ctx = SessionContext.create_optimized(
             random_seed=self.RANDOM_SEED + trial_id,
-            cache_id=f"{self.CACHE_ID}_{impl.value}_{language_model}_{trial_id}"
+            cache_id=f"{self.CACHE_ID}_{self._dataset_name}_{impl.value}_{language_model}_{trial_id}"
             if self.CACHE_ID
             else None,
         )
@@ -631,7 +631,7 @@ class ClaimEvaluator(ABC):
             ctx.enable_similarity_filter()
         if config.cache:
             ctx.enable_cache(
-                f"{self.CACHE_ID}_{impl.value}_{language_model}_{trial_id}"
+                f"{self.CACHE_ID}_{self._dataset_name}_{impl.value}_{language_model}_{trial_id}"
                 if self.CACHE_ID
                 else None
             )
