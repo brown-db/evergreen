@@ -1,17 +1,30 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, count_if, prompt
+from evergreen.planner.logical.expr import col, count_if, prompt
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class CardinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    NAME = "cardinal_claim_1"
+    CLAIM = (
+        "Less than a handful of customers complained about the restaurant's "
+        "service quality."
+    )
+    HINTS = "The phrase 'less than a handful' suggests a threshold of less than 5."
+    SCHEMA = REVIEW_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/johns_roast_pork/summarize_2026-02-10_18-24-08.json"
+    )
+
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -21,8 +34,8 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} complains about the restaurant's "
-                    "service quality",
+                    "Identify whether the restaurant review {text} complains about the "
+                    "restaurant's service quality",
                     bool,
                 ).alias("complains_about_service")
             )
@@ -43,24 +56,6 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
             .check(col("service_complaint_count") < 5)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("service_complaint_count") < 5
-
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("complains_about_service"),)
-
-    def hints(self) -> str:
-        return "The phrase 'less than a handful' suggests a threshold of less than 5."
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = CardinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/johns_roast_pork/summarize/cardinal_claim_1_2026-02-17_19-39-26.json"
-        ),
-        dataset_key=("review_id",),
-        text_field_name="text",
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    CardinalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

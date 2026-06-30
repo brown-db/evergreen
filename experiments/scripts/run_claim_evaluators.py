@@ -15,24 +15,35 @@ def run_evaluator(
     impls: list[str],
     lms: list[str],
     eval_sim_filter: bool,
+    compile: bool,
     trial_count: int,
 ) -> tuple[str, int]:
     start = datetime.now()
     print(f"[START {start:%H:%M:%S}] {module}")
 
-    cmd = [
-        sys.executable,
-        "-m",
-        module,
-        "--impls",
-        *impls,
-        "--lms",
-        *lms,
-        "--trial_count",
-        str(trial_count),
-    ]
-    if eval_sim_filter:
-        cmd.append("--eval_sim_filter")
+    if compile:
+        cmd = [
+            sys.executable,
+            "-m",
+            module,
+            "--compile",
+            "--trial_count",
+            str(trial_count),
+        ]
+    else:
+        cmd = [
+            sys.executable,
+            "-m",
+            module,
+            "--impls",
+            *impls,
+            "--lms",
+            *lms,
+            "--trial_count",
+            str(trial_count),
+        ]
+        if eval_sim_filter:
+            cmd.append("--eval_sim_filter")
 
     result = subprocess.run(cmd)
 
@@ -49,6 +60,7 @@ def main(
     impls: list[str],
     lms: list[str],
     eval_sim_filter: bool,
+    compile: bool,
     trial_count: int,
     max_workers: int,
 ):
@@ -72,15 +84,19 @@ def main(
         print("No modules matching the given include/exclude patterns")
         sys.exit(1)
 
-    print(f"Running {len(modules)} evaluators:")
+    mode = "Compiling" if compile else "Running"
+    print(f"{mode} {len(modules)} evaluators:")
     print("  Modules:")
     for m in modules:
         print(f"    - {m}")
-    print(f"  Implementations: {impls}")
-    print(f"  Models: {lms}")
+    if not compile:
+        print(f"  Implementations: {impls}")
+        print(f"  Models: {lms}")
     print(f"  Trials: {trial_count}")
     print(f"  Workers: {max_workers}")
-    if eval_sim_filter:
+    if compile:
+        print("  Compilation only: enabled")
+    elif eval_sim_filter:
         print("  Similarity filter evaluation: enabled")
     print()
 
@@ -91,6 +107,7 @@ def main(
         impls=impls,
         lms=lms,
         eval_sim_filter=eval_sim_filter,
+        compile=compile,
         trial_count=trial_count,
     )
 
@@ -126,6 +143,7 @@ if __name__ == "__main__":
         default=[],
     )
     parser.add_argument("--eval_sim_filter", action="store_true")
+    parser.add_argument("--compile", action="store_true")
     parser.add_argument("--trial_count", type=int, default=3)
     parser.add_argument("--max_workers", type=int, default=1)
     args = parser.parse_args()
@@ -136,6 +154,7 @@ if __name__ == "__main__":
         args.impls,
         args.lms,
         args.eval_sim_filter,
+        args.compile,
         args.trial_count,
         args.max_workers,
     )

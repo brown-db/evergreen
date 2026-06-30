@@ -142,7 +142,9 @@ class DataFrame:
 
             Filter using a prompt expression:
 
-            >>> df.filter(prompt("The {review} mentions the movie's cinematography"))
+            >>> df.filter(
+            ...     prompt("The movie {review} describes the movie's cinematography")
+            ... )
         """
         new_plan = LogicalPlanBuilder(self._plan).filter(predicate).build()
         return DataFrame(new_plan, self._session_state)
@@ -171,7 +173,9 @@ class DataFrame:
             ...     NEUTRAL = "neutral"
             >>> df.map(
             ...     prompt(
-            ...         "Identify the sentiment of the {review}", Sentiment
+            ...         "Identify the sentiment of the movie {review} towards the "
+            ...         "movie",
+            ...         Sentiment
             ...     ).alias("sentiment")
             ... )
 
@@ -179,7 +183,8 @@ class DataFrame:
 
             >>> df.map(
             ...     prompt(
-            ...         "Identify whether the {review} says that the price is high",
+            ...         "Identify whether the movie {review} says that the movie's "
+            ...         "ticket price is high",
             ...         bool
             ...     ).alias("price_is_high")
             ... )
@@ -214,8 +219,8 @@ class DataFrame:
             >>> (
             ...     df.map(
             ...         prompt(
-            ...             "Identify whether the {review} says that the movie has too "
-            ...             "much violence", bool
+            ...             "Identify whether the movie {review} says that the movie "
+            ...             "has too much violence", bool
             ...         ).alias("has_too_much_violence")
             ...     )
             ...     .aggregate(
@@ -228,12 +233,12 @@ class DataFrame:
 
             >>> (
             ...     df.filter(
-            ...         prompt("The {review} mentions the movie's cinematography")
+            ...         prompt("The movie {review} mentions the movie's cinematography")
             ...     )
             ...     .map(
             ...         prompt(
-            ...             "Identify whether the {review} calls the cinematography "
-            ...             "beautiful",
+            ...             "Identify whether the movie {review} calls the movie's "
+            ...             "cinematography beautiful",
             ...             bool
             ...         ).alias("is_beautiful")
             ...     )
@@ -243,16 +248,18 @@ class DataFrame:
             ... )
 
             Group by star rating and compute the proportion of reviews mentioning
-            service:
+            the movie's pacing:
 
             >>> (
             ...     df.map(
             ...         prompt(
-            ...             "Identify whether the {review} mentions service", bool
-            ...         ).alias("mentions_service")
+            ...             "Identify whether the movie {review} mentions the movie's "
+            ...             "pacing",
+            ...             bool
+            ...         ).alias("mentions_pacing")
             ...     )
             ...     .aggregate(
-            ...         [proportion(col("mentions_service")).alias("service_prop")],
+            ...         [proportion(col("mentions_pacing")).alias("pacing_prop")],
             ...         group_by=[col("stars")]
             ...     )
             ... )

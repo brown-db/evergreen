@@ -839,6 +839,16 @@ class InsertShuffleForEstimation(LogicalOptimizerRule):
 
         match plan:
             case Aggregate(agg_exprs, group_exprs, _, input):
+                # TODO: This only checks that the aggregate supports estimation,
+                # not that estimation can actually be exploited downstream. When
+                # no early-stop comparison reaches the aggregate, accumulators
+                # never terminate early, so the Shuffle adds buffering/reordering
+                # overhead without any benefit. This happens, for example, for
+                # ranking queries, where the aggregate feeds a WithRank operator
+                # that must compute every group exactly. The overhead is negligible
+                # (no extra LLM calls, only reordering above an existing Sort), but
+                # we should skip the Shuffle in that case.
+
                 if input.is_or_above(Shuffle) or not self._supports_estimation(
                     agg_exprs, input
                 ):

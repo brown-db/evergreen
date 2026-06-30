@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "universal_existential_claim_1",
+    "timestamp": "2026-06-15_19-26-10",
+    "claim": "All airlines have customer complaints about the taste of the food provided on their flight.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "company_id",
+          "dtype": "str",
+          "description": "The unique identifier of the airline company."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Compare the customer support dialogs for the different airline companies. Highlight the commonalities and differences between the companies and integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states: \"All airlines have customer complaints about the taste of the food provided on their flight.\"\n\nFormally:\n- \u2200c \u2208 Companies: \u2203d \u2208 Dialogs(c): complains_about_food_taste(d)\n\nThis means: For every airline company, there exists at least one dialog that contains a complaint about the taste of food on the flight.\n\n## Step 2: Query Operators and Expressions\n\n1. First, I need to identify whether each dialog contains a complaint about the taste of food on the flight \u2192 `map(prompt(..., bool))`\n2. Then, I need to aggregate by company to check if each company has at least one such complaint \u2192 `aggregate` with `bool_or` grouped by `company_id`\n3. Finally, I need to check that ALL companies have at least one such complaint \u2192 `aggregate` with `bool_and`\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the customer support {dialog} contains a customer complaint about the taste of the food provided on the flight\",\n            bool\n        ).alias(\"complains_about_food_taste\")\n    )\n    .aggregate(\n        [bool_or(col(\"complains_about_food_taste\")).alias(\"has_food_taste_complaint\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [bool_and(col(\"has_food_taste_complaint\")).alias(\"all_airlines_have_complaint\")]\n    )\n    .check(col(\"all_airlines_have_complaint\"))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the customer support {dialog} contains a customer complaint about the taste of the food provided on the flight\",\n            bool\n        ).alias(\"complains_about_food_taste\")\n    )\n    .aggregate(\n        [bool_or(col(\"complains_about_food_taste\")).alias(\"has_food_taste_complaint\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [bool_and(col(\"has_food_taste_complaint\")).alias(\"all_airlines_have_complaint\")]\n    )\n    .check(col(\"all_airlines_have_complaint\"))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 8059,
+        "output_token_count": 403,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.808355670422316
+  }
+}

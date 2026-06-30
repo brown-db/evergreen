@@ -50,7 +50,10 @@ class Expr(ABC):
         Examples:
             Name a computed column:
 
-            >>> prompt("Identify the sentiment of the {review}", str).alias("sentiment")
+            >>> prompt(
+            ...     "Identify whether the movie {review} describes the movie's "
+            ...     "soundtrack", bool
+            ... ).alias("describes_soundtrack")
         """
         return Alias(self, name)
 
@@ -299,53 +302,6 @@ class Not(Expr):
 
 
 @dataclass(frozen=True)
-class Contains(Expr):
-    expr: Expr
-    pattern: str
-    case_sensitive: bool
-
-    def __str__(self) -> str:
-        return (
-            f"contains({self.expr}, {self.pattern!r}, "
-            f"case_sensitive={self.case_sensitive})"
-        )
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def to_field(self, input_schema: Schema) -> Field:
-        return Field(str(self), bool)
-
-
-def contains(expr: Expr, pattern: str, case_sensitive: bool = True) -> Contains:
-    """Check if a string contains the given pattern.
-
-    Tests whether the string expression contains the specified substring.
-    Returns a boolean expression that evaluates to `True` if the pattern
-    is found, `False` otherwise.
-
-    Args:
-        expr: A string expression to search within.
-        pattern: The substring to search for.
-        case_sensitive: If `True` (default), the match is case-sensitive.
-            If `False`, the match ignores case.
-
-    Returns:
-        A boolean expression that is `True` if the pattern is found.
-
-    Examples:
-        Filter rows where the tags contain "action":
-
-        >>> df.filter(contains(col("tags"), "action"))
-
-        Case-insensitive search:
-
-        >>> df.filter(contains(col("tags"), "action", case_sensitive=False))
-    """
-    return Contains(expr, pattern, case_sensitive)
-
-
-@dataclass(frozen=True)
 class Prompt(Expr):
     prompt_str: str
     return_type: type[object]
@@ -380,11 +336,15 @@ def prompt(prompt_str: str, return_type: type[object] = bool) -> Prompt:
     Examples:
         Boolean predicate prompt:
 
-        >>> df.filter(prompt("The {review} mentions the movie's cinematography"))
+        >>> df.filter(prompt("The movie {review} mentions the movie's cinematography"))
 
         Extraction prompt:
 
-        >>> df.map(prompt("Extract the main topic of the {review}", str).alias("topic"))
+        >>> df.map(
+        ...     prompt(
+        ...         "Extract the main topic of the movie {review}", str
+        ...     ).alias("topic")
+        ... )
 
         Classification prompt:
 
@@ -395,7 +355,8 @@ def prompt(prompt_str: str, return_type: type[object] = bool) -> Prompt:
         ...     NEUTRAL = "neutral"
         >>> df.map(
         ...     prompt(
-        ...         "Identify the sentiment of the {review}", Sentiment
+        ...         "Identify the sentiment of the movie {review} towards the movie",
+        ...         Sentiment
         ...     ).alias("sentiment")
         ... )
     """

@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "existential_universal_claim_1",
+    "timestamp": "2026-06-15_19-36-25",
+    "claim": "Some McDonald's locations had no negative reviews.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "business_id",
+          "dtype": "str",
+          "description": "The unique identifier of the reviewed restaurant."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The customer review text."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Compare the reviews for the different McDonald''s locations. Highlight the commonalities and differences between the restaurant locations."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim \"Some McDonald's locations had no negative reviews\" can be expressed as:\n\n\u2203 location \u2208 Locations : \u2200 review \u2208 Reviews(location) : \u00acNegative(review)\n\nThis is already in a form we can work with. In NNF:\n- There exists at least one location (group by business_id) where all reviews are not negative.\n\n## Step 2: Query Operators and Expressions\n\n1. First, I need to identify whether each review is negative using `map(prompt(..., bool))`.\n2. Then, aggregate by `business_id` to check if there are locations where no reviews are negative. This means for those locations, the proportion of negative reviews is 0 (or equivalently, `bool_and(~col(\"is_negative\"))` is True).\n3. Finally, check if at least one such location exists using `bool_or()`.\n\nThe logical flow:\n- `map()`: Label each review as negative or not\n- `aggregate()` with `group_by=[col(\"business_id\")]`: For each location, check if all reviews are not negative (`bool_and(~col(\"is_negative\"))`)\n- `aggregate()`: Check if any location satisfies this condition (`bool_or()`)\n- `check()`: Verify the result\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the restaurant review {text} is a negative review\",\n            bool\n        ).alias(\"is_negative\")\n    )\n    .aggregate(\n        [bool_and(~col(\"is_negative\")).alias(\"no_negative_reviews\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [bool_or(col(\"no_negative_reviews\")).alias(\"some_locations_no_negative\")]\n    )\n    .check(col(\"some_locations_no_negative\"))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the restaurant review {text} is a negative review\",\n            bool\n        ).alias(\"is_negative\")\n    )\n    .aggregate(\n        [bool_and(~col(\"is_negative\")).alias(\"no_negative_reviews\")],\n        group_by=[col(\"business_id\")]\n    )\n    .aggregate(\n        [bool_or(col(\"no_negative_reviews\")).alias(\"some_locations_no_negative\")]\n    )\n    .check(col(\"some_locations_no_negative\"))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 8041,
+        "output_token_count": 475,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.970036985352635
+  }
+}

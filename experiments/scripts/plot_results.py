@@ -1,6 +1,8 @@
 import json
 import shutil
+from collections.abc import Callable
 from enum import Enum, auto
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from experiments.common import MODEL_PRICING
+from experiments.common import DEFAULT_LANGUAGE_MODEL, MODEL_PRICING
 
 RESULTS_DIR = Path("experiments/results/claim_evaluator")
 FIGURES_DIR = Path("experiments/figures")
@@ -33,9 +35,68 @@ CLAIM_TO_CLAIM_ID = {
     "village_whiskey\nsummarize\nexistential_claim_1": "C14",
     "village_whiskey\nsummarize\nproportional_claim_1": "C15",
     "village_whiskey\nsummarize\nuniversal_claim_1": "C16",
+    "play_station\nsummarize\ncardinal_claim_1": "C17",
+    "play_station\nsummarize\ncardinal_claim_2": "C18",
+    "play_station\nsummarize\nproportional_claim_1": "C19",
+    "play_station\nsummarize\nproportional_claim_2": "C20",
+    "airlines\ncompare\ncardinal_proportional_claim_1": "C21",
+    "airlines\ncompare\ncardinal_universal_claim_1": "C22",
+    "airlines\ncompare\nexistential_proportional_claim_1": "C23",
+    "airlines\ncompare\nuniversal_existential_claim_1": "C24",
+    "airlines\nrank\nordinal_claim_1": "C25",
+    "airlines\nrank\nordinal_claim_2": "C26",
+    "airlines\nrank\nordinal_claim_3": "C27",
+    "airlines\nrank\nordinal_claim_4": "C28",
+    "uber\nsummarize\ncardinal_claim_1": "C29",
+    "uber\nsummarize\ncardinal_claim_2": "C30",
+    "uber\nsummarize\nproportional_claim_1": "C31",
+    "uber\nsummarize\nproportional_claim_2": "C32",
 }
 
 CLAIM_ID_TO_CLAIM = {v: k for k, v in CLAIM_TO_CLAIM_ID.items()}
+
+
+@cache
+def claim_operator_ids() -> dict[str, tuple[object | None, object | None]]:
+    """Map each claim key (``'{dataset}\\n{task}\\n{NAME}'``) to (filter, map) ids.
+
+    Operator ids are content-derived (kind + dataset + prompt [+ return_type])
+    via ``agreement._dedup_key``, so claims that reuse the same semantic operator
+    share an id and can be de-duplicated. Every benchmark claim has exactly one
+    map and at most one filter, so a single (filter_id, map_id) pair per claim
+    suffices. The key matches the ``"claim"`` column built in ``load_results``.
+    """
+    from experiments.claim_evaluator import SemanticOperator, SemanticOperatorKind
+    from experiments.scripts.agreement import all_evaluator_classes
+
+    def op_id(operator: SemanticOperator, dataset_path: str) -> tuple[object, ...]:
+        # Mirror agreement._dedup_key: maps also key on return_type (same prompt
+        # with a different label space is a different decision); filters are bool.
+        if operator.kind is SemanticOperatorKind.MAP:
+            return (
+                operator.kind,
+                dataset_path,
+                operator.prompt_str,
+                operator.return_type,
+            )
+        return (operator.kind, dataset_path, operator.prompt_str)
+
+    mapping: dict[str, tuple[object | None, object | None]] = {}
+    for cls in all_evaluator_classes():
+        evaluator = cls()
+        task = cls.AGG_RESULT_PATH.name.split("_")[0]
+        key = f"{cls.AGG_RESULT_PATH.parent.name}\n{task}\n{cls.NAME}"
+
+        filter_id: object | None = None
+        map_id: object | None = None
+        for operator in evaluator.semantic_operators():
+            if operator.kind is SemanticOperatorKind.FILTER:
+                filter_id = op_id(operator, evaluator.dataset_path)
+            else:
+                map_id = op_id(operator, evaluator.dataset_path)
+        mapping[key] = (filter_id, map_id)
+    return mapping
+
 
 IMPL_MODEL_LABELS = {
     "base_rm_claude-opus-4-6": "base_rm Claude Opus 4.6",
@@ -44,24 +105,70 @@ IMPL_MODEL_LABELS = {
     "rag_agent_claude-opus-4-6": "rag_agent Claude Opus 4.6",
     "rag_agent_claude-sonnet-4-6": "rag_agent Claude Sonnet 4.6",
     "rag_agent_claude-haiku-4-5": "rag_agent Claude Haiku 4.5",
+    "rlm_claude-opus-4-6": "rlm Claude Opus 4.6",
+    "rlm_claude-sonnet-4-6": "rlm Claude Sonnet 4.6",
+    "rlm_claude-haiku-4-5": "rlm Claude Haiku 4.5",
     "evg_unopt_claude-opus-4-6": "evg_unopt Claude Opus 4.6",
+    "evg_unopt_claude-sonnet-4-6": "evg_unopt Claude Sonnet 4.6",
+    "evg_unopt_claude-haiku-4-5": "evg_unopt Claude Haiku 4.5",
     "evg_opt_claude-opus-4-6": "evg_opt Claude Opus 4.6",
     "evg_opt_claude-sonnet-4-6": "evg_opt Claude Sonnet 4.6",
     "evg_opt_claude-haiku-4-5": "evg_opt Claude Haiku 4.5",
-    "evg_opt_llama4-maverick": "evg_opt Llama 4 Maverick",
-    "evg_opt_llama4-scout": "evg_opt Llama 4 Scout",
-    "evg_opt_llama3.1-8b": "evg_opt Llama 3.1 8B",
+    "evg_opt_qwen3-vl-235b-a22b": "evg_opt Qwen3-VL",
+    "evg_opt_qwen3-next-80b-a3b": "evg_opt Qwen3-Next",
+    # Reference-query variants emit the filter/map/provenance metric.
+    "evg_unopt_ref_query_claude-opus-4-6": "evg_unopt_ref_query Claude Opus 4.6",
+    "evg_unopt_ref_query_claude-sonnet-4-6": "evg_unopt_ref_query Claude Sonnet 4.6",
+    "evg_unopt_ref_query_claude-haiku-4-5": "evg_unopt_ref_query Claude Haiku 4.5",
+    "evg_opt_ref_query_claude-opus-4-6": "evg_opt_ref_query Claude Opus 4.6",
+    "evg_opt_ref_query_claude-sonnet-4-6": "evg_opt_ref_query Claude Sonnet 4.6",
+    "evg_opt_ref_query_claude-haiku-4-5": "evg_opt_ref_query Claude Haiku 4.5",
+    "evg_opt_ref_query_qwen3-vl-235b-a22b": "evg_opt_ref_query Qwen3-VL",
+    "evg_opt_ref_query_qwen3-next-80b-a3b": "evg_opt_ref_query Qwen3-Next",
 }
 
-IMPLEMENTATIONS = ["base_rm", "rag_agent", "evg_unopt", "evg_opt"]
+IMPLEMENTATIONS = [
+    "base_rm",
+    "rag_agent",
+    "rlm",
+    "evg_unopt",
+    "evg_opt",
+]
+
+# Implementations that run the reference query and therefore carry the
+# filter/map/provenance operator-quality metrics.
+REF_QUERY_IMPLEMENTATIONS = ["evg_unopt_ref_query", "evg_opt_ref_query"]
+
+# Implementations that execute the compiled query and therefore incur the
+# one-time claim-compilation cost/latency.
+COMPILED_QUERY_IMPLEMENTATIONS = ["evg_unopt", "evg_opt"]
 
 _MODEL_LABELS = {
     "claude-opus-4-6": "Opus 4.6",
     "claude-sonnet-4-6": "Sonnet 4.6",
     "claude-haiku-4-5": "Haiku 4.5",
-    "llama4-maverick": "Maverick",
-    "llama4-scout": "Scout",
-    "llama3.1-8b": "8B",
+    "qwen3-vl-235b-a22b": "Qwen3-VL",
+    "qwen3-next-80b-a3b": "Qwen3-Next",
+}
+
+# LaTeX row macros for the results tables. The ``*_ref_query`` runs supply the
+# operator-quality metrics but are displayed under the same implementation macro.
+LATEX_IMPL_MACROS = {
+    "base_rm": r"\baserm",
+    "rag_agent": r"\ragagent",
+    "rlm": r"\rlm",
+    "evg_unopt": r"\evgunopt",
+    "evg_opt": r"\evgopt",
+    "evg_unopt_ref_query": r"\evgunopt",
+    "evg_opt_ref_query": r"\evgopt",
+}
+
+LATEX_MODEL_NAMES = {
+    "claude-opus-4-6": "Claude Opus 4.6",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-haiku-4-5": "Claude Haiku 4.5",
+    "qwen3-vl-235b-a22b": "Qwen3-VL",
+    "qwen3-next-80b-a3b": "Qwen3-Next",
 }
 
 ABLATION_MODEL = "claude-haiku-4-5"
@@ -70,10 +177,10 @@ _ABLATION_STEP_LABELS = {
     "evg_opt": "All Opt",
     "evg_abl_no_es": "ES",
     "evg_abl_no_rs": "RS",
-    "evg_abl_no_est": "ECS",
-    "evg_abl_no_fus": "OF",
+    "evg_abl_no_ecs": "ECS",
+    "evg_abl_no_of": "OF",
     "evg_abl_no_sf": "SF",
-    "evg_abl_no_cache": "PC",
+    "evg_abl_no_pc": "PC",
 }
 
 ABLATION_IMPLEMENTATIONS = list(_ABLATION_STEP_LABELS)
@@ -96,9 +203,21 @@ ABLATION_APPLICABLE_CLAIMS = {
         "C14",
         "C15",
         "C16",
+        "C17",
+        "C18",
+        "C19",
+        "C20",
+        "C21",
+        "C22",
+        "C23",
+        "C24",
+        "C29",
+        "C30",
+        "C31",
+        "C32",
     ),
-    "evg_abl_no_rs": ("C2", "C6", "C7", "C8", "C13", "C14"),
-    "evg_abl_no_est": (
+    "evg_abl_no_rs": ("C2", "C6", "C7", "C8", "C13", "C14", "C24"),
+    "evg_abl_no_ecs": (
         "C1",
         "C3",
         "C4",
@@ -108,10 +227,40 @@ ABLATION_APPLICABLE_CLAIMS = {
         "C8",
         "C15",
         "C16",
+        "C17",
+        "C18",
+        "C19",
+        "C20",
+        "C21",
+        "C22",
+        "C23",
+        "C24",
+        "C29",
+        "C30",
+        "C31",
+        "C32",
     ),
-    "evg_abl_no_fus": ("C3", "C9", "C10", "C11", "C12", "C13", "C16"),
-    "evg_abl_no_sf": ("C3", "C9", "C10", "C11", "C12", "C13", "C16"),
-    "evg_abl_no_cache": ("C9", "C10", "C11", "C12"),
+    "evg_abl_no_of": (
+        "C3",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C16",
+        "C21",
+        "C22",
+    ),
+    "evg_abl_no_sf": (
+        "C3",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C16",
+        "C21",
+        "C22",
+    ),
+    "evg_abl_no_pc": ("C9", "C10", "C11", "C12", "C25", "C26", "C27", "C28"),
 }
 
 
@@ -119,12 +268,9 @@ FIGURE_SIZE = (40, 5)
 
 
 class FormatType(Enum):
-    TOKENS = auto()
     COST = auto()
     LATENCY = auto()
     SCORE = auto()
-    COUNT = auto()
-    MULTIPLIER = auto()
 
 
 def compute_token_costs(
@@ -174,8 +320,61 @@ def get_impl_models(
     return impl_models
 
 
+def get_reference(df: pd.DataFrame) -> pd.Series:
+    """Ground-truth verification result per claim (the evg_ref ensemble)."""
+    return df[df["implementation"] == "evg_ref"].set_index("claim")[
+        "verification_result"
+    ]
+
+
+def get_ablation_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows used for ablations: the ablation model plus the reference labels."""
+    return df[(df["model"] == ABLATION_MODEL) | (df["implementation"] == "evg_ref")]
+
+
+def load_compilation_costs() -> dict[tuple[str, int], dict[str, float]]:
+    """Map (claim, trial_id) -> compilation cost/latency/token counts.
+
+    Compilation is a one-time planning step (run with the compiler model) that
+    produces the query consumed by evg_opt / evg_unopt, so its cost and latency
+    are attributed to those implementations.
+    """
+    costs: dict[tuple[str, int], dict[str, float]] = {}
+
+    for file_path in RESULTS_DIR.rglob("compiled_query_*.json"):
+        with open(file_path) as file:
+            data = json.load(file)
+
+        compilation = data["claim_compilation_result"]
+        metadata = data["metadata"]
+        lm_metrics = compilation["language_model_metrics"]
+
+        input_cost, output_cost = compute_token_costs(
+            DEFAULT_LANGUAGE_MODEL, lm_metrics
+        )
+
+        path_parts = file_path.relative_to(RESULTS_DIR).parts
+        claim = f"{path_parts[1]}\n{path_parts[2]}\n{metadata['name']}"
+        trial_id = int(file_path.stem.split("_")[-1])
+
+        costs[(claim, trial_id)] = {
+            "input_token_cost": input_cost,
+            "output_token_cost": output_cost,
+            "total_token_cost": input_cost + output_cost,
+            "lm_call_count": sum(
+                m["prompt_count"] - m["prompt_cache_hit_count"] for m in lm_metrics
+            ),
+            "input_token_count": sum(m["input_token_count"] for m in lm_metrics),
+            "output_token_count": sum(m["output_token_count"] for m in lm_metrics),
+            "latency": compilation["latency"],
+        }
+
+    return costs
+
+
 def load_results() -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
+    compilation_costs = load_compilation_costs()
 
     for file_path in RESULTS_DIR.rglob("*.json"):
         with open(file_path) as file:
@@ -192,17 +391,25 @@ def load_results() -> pd.DataFrame:
         opt_lm_metrics = query_metrics["optimizer_language_model_metrics"]
 
         model_name = exec_lm_metrics[0]["model_name"]
+        impl = metadata["implementation"]
 
-        exec_input_token_cost, exec_output_token_cost = compute_token_costs(
-            model_name, exec_lm_metrics
-        )
-        opt_input_token_cost, opt_output_token_cost = compute_token_costs(
-            "claude-opus-4-6", opt_lm_metrics
-        )
+        # evg_ref runs the ground-truth ensemble; its cost is never reported and
+        # its models are not in MODEL_PRICING, so skip pricing it entirely.
+        if impl == "evg_ref":
+            input_token_cost = float("nan")
+            output_token_cost = float("nan")
+            total_token_cost = float("nan")
+        else:
+            exec_input_token_cost, exec_output_token_cost = compute_token_costs(
+                model_name, exec_lm_metrics
+            )
+            opt_input_token_cost, opt_output_token_cost = compute_token_costs(
+                DEFAULT_LANGUAGE_MODEL, opt_lm_metrics
+            )
 
-        input_token_cost = exec_input_token_cost + opt_input_token_cost
-        output_token_cost = exec_output_token_cost + opt_output_token_cost
-        total_token_cost = input_token_cost + output_token_cost
+            input_token_cost = exec_input_token_cost + opt_input_token_cost
+            output_token_cost = exec_output_token_cost + opt_output_token_cost
+            total_token_cost = input_token_cost + output_token_cost
 
         lm_metrics = exec_lm_metrics + opt_lm_metrics
 
@@ -216,11 +423,13 @@ def load_results() -> pd.DataFrame:
 
         # Parse path: .../claim_evaluator/{source}/{dataset}/{task}/{claim}/
         path_parts = file_path.relative_to(RESULTS_DIR).parts
+        claim_key = f"{path_parts[1]}\n{path_parts[2]}\n{metadata['name']}"
+        filter_op_id, map_op_id = claim_operator_ids()[claim_key]
 
-        impl = metadata["implementation"]
-
-        row = {
-            "claim": f"{path_parts[1]}\n{path_parts[2]}\n{metadata['name']}",
+        row: dict[str, Any] = {
+            "claim": claim_key,
+            "filter_op_id": filter_op_id,
+            "map_op_id": map_op_id,
             "implementation": impl,
             "model": model_name,
             "trial_id": metadata["trial_id"],
@@ -235,11 +444,24 @@ def load_results() -> pd.DataFrame:
             "latency": latency,
         }
 
+        if impl in COMPILED_QUERY_IMPLEMENTATIONS:
+            compilation = compilation_costs[(row["claim"], row["trial_id"])]
+            for field in (
+                "input_token_cost",
+                "output_token_cost",
+                "total_token_cost",
+                "lm_call_count",
+                "input_token_count",
+                "output_token_count",
+                "latency",
+            ):
+                row[field] += compilation[field]
+
         filter_metrics = evaluation_result["filter_metrics"]
         map_metrics = evaluation_result["map_metrics"]
         prov_tokens = evaluation_result["prov_tokens"]
 
-        if prov_tokens:
+        if prov_tokens and all(t["is_valid"] is not None for t in prov_tokens):
             row["prov_valid_count"] = sum(t["is_valid"] for t in prov_tokens)
             row["prov_total"] = len(prov_tokens)
             row["provenance_precision"] = row["prov_valid_count"] / row["prov_total"]
@@ -270,63 +492,18 @@ def load_results() -> pd.DataFrame:
 
 def format_value(value: float, format_type: FormatType) -> str:
     match format_type:
-        case FormatType.TOKENS:
-            if value >= 1e6:
-                return f"{value / 1e6:.1f}M"
-            if value >= 1e3:
-                return f"{value / 1e3:.0f}k"
-            return f"{value:.0f}"
         case FormatType.COST:
             return f"${value:.2f}" if value >= 1 else f"${value:.3f}"
         case FormatType.LATENCY:
             return f"{value / 1e3:.1f}k" if value >= 1e3 else f"{value:.0f}"
         case FormatType.SCORE:
             return f"{value:.2f}"
-        case FormatType.COUNT:
-            return f"{value:.0f}"
-        case FormatType.MULTIPLIER:
-            return f"{value:.1f}"
-
-
-def add_bar_labels(axis: Any, format_type: FormatType, rotation: int = 0) -> None:
-    for container in axis.containers:
-        labels = [format_value(bar.get_height(), format_type) for bar in container]
-        axis.bar_label(container, labels=labels, rotation=rotation)
 
 
 def save_figure(filename: str) -> None:
     plt.tight_layout()
-    plt.savefig(FIGURES_DIR / f"{filename}.pdf", bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / f"{filename}.pdf")
     plt.close()
-
-
-def save_table(
-    rows_df: pd.DataFrame,
-    value_col: str,
-    group_cols: list[str],
-    filename: str,
-    format_type: FormatType,
-    pivot_col: str | None = None,
-) -> None:
-    summary = (
-        rows_df.groupby(group_cols)[value_col].agg(["mean", "min", "max"]).reset_index()
-    )
-    summary["formatted"] = [
-        f"{format_value(row['mean'], format_type)} "
-        f"[{format_value(row['min'], format_type)}, "
-        f"{format_value(row['max'], format_type)}]"
-        for _, row in summary.iterrows()
-    ]
-    if pivot_col:
-        table = summary.pivot(
-            index=[c for c in group_cols if c != pivot_col],
-            columns=pivot_col,
-            values="formatted",
-        ).reset_index()
-    else:
-        table = summary[group_cols + ["formatted"]]
-
-    table.to_csv(FIGURES_DIR / f"{filename}.csv", index=False)
 
 
 def compute_precision_recall_f1(
@@ -338,167 +515,194 @@ def compute_precision_recall_f1(
     return precision, recall, f1
 
 
-def plot_precision_recall_f1(
-    rows: list[dict[str, object]], ylabel: str, order: list[str], filename: str
-) -> None:
-    _, axis = plt.subplots(figsize=FIGURE_SIZE)
-    sns.barplot(
-        data=pd.DataFrame(rows),
-        x="impl_model",
-        y="value",
-        hue="metric",
-        ax=axis,
-        order=order,
-        errorbar=("pi", 100),
-        err_kws={"alpha": 0.5},
+def hallucination_counts(ref: pd.Series, pred: pd.Series) -> tuple[int, int, int]:
+    """Confusion counts with the positive class being a detected hallucination.
+
+    ``verification_result`` is ``True`` when a claim is grounded, so a hallucination
+    (false claim) is a ``False`` value. Negating turns "not grounded" into the
+    positive class for precision/recall/F1.
+    """
+    tp = int((~ref & ~pred).sum())  # both flag a hallucination
+    fp = int((ref & ~pred).sum())  # predicted hallucination, actually grounded
+    fn = int((~ref & pred).sum())  # missed an actual hallucination
+    return tp, fp, fn
+
+
+def _mean_range(values: list[float], format_type: FormatType) -> str:
+    """Format per-trial values as ``mean [min, max]`` via the shared formatter.
+
+    Cost cells live under a ``Cost (\\$)`` header, so the ``$`` that
+    ``format_value`` prepends for currency is stripped.
+    """
+    arr = np.array(values, dtype=float)
+    cell = (
+        f"{format_value(float(arr.mean()), format_type)} "
+        f"[{format_value(float(arr.min()), format_type)}, "
+        f"{format_value(float(arr.max()), format_type)}]"
     )
-    axis.set(xlabel="implementation", ylabel=ylabel)  # type: ignore
-    add_bar_labels(axis, FormatType.SCORE)
-    save_figure(filename)
+    return cell.replace("$", "")
 
 
-def plot_verification_quality(
+def _verification_cells(
+    df: pd.DataFrame, impl_model: str, reference: pd.Series
+) -> dict[str, str]:
+    """Per-trial verification quality, cost, and latency, aggregated over trials."""
+    impl_df = df[df["impl_model"] == impl_model]
+    precision: list[float] = []
+    recall: list[float] = []
+    f1: list[float] = []
+    accuracy: list[float] = []
+    cost: list[float] = []
+    latency: list[float] = []
+    for trial_id in sorted(impl_df["trial_id"].unique()):
+        trial_df = impl_df[impl_df["trial_id"] == int(trial_id)]
+        pred = trial_df.set_index("claim")["verification_result"]
+        common = reference.index.intersection(pred.index)
+        ref_common, pred_common = reference.loc[common], pred.loc[common]
+
+        tp, fp, fn = hallucination_counts(ref_common, pred_common)
+        p, r, f = compute_precision_recall_f1(tp, fp, fn)
+        precision.append(p)
+        recall.append(r)
+        f1.append(f)
+        accuracy.append(
+            (ref_common == pred_common).sum() / len(common) if len(common) else 0
+        )
+        cost.append(trial_df["total_token_cost"].mean())
+        latency.append(trial_df["latency"].mean())
+
+    return {
+        "Precision": _mean_range(precision, FormatType.SCORE),
+        "Recall": _mean_range(recall, FormatType.SCORE),
+        "F1 Score": _mean_range(f1, FormatType.SCORE),
+        "Accuracy": _mean_range(accuracy, FormatType.SCORE),
+        "Cost (\\$)": _mean_range(cost, FormatType.COST),
+        "Latency (s)": _mean_range(latency, FormatType.LATENCY),
+    }
+
+
+def _component_cells(df: pd.DataFrame, impl_model: str) -> dict[str, str]:
+    """Per-trial provenance/filter/map quality, micro-averaged across claims.
+
+    Filter and map metrics are de-duplicated by operator id: some claims reuse
+    the same semantic operator over the same data (e.g. the four ranking claims
+    share one filter and one map), so pooling raw per-claim counts would count
+    those operators multiple times. Provenance is a query-level metric (it
+    depends on the full plan, including the deterministic operators that differ
+    across otherwise-shared claims), so it stays pooled across all claims.
+    """
+    impl_df = df[df["impl_model"] == impl_model]
+    prov: list[float] = []
+    filter_p: list[float] = []
+    filter_r: list[float] = []
+    filter_f1: list[float] = []
+    map_acc: list[float] = []
+    for trial_id in sorted(impl_df["trial_id"].unique()):
+        trial_df = impl_df[impl_df["trial_id"] == int(trial_id)]
+
+        prov_total = trial_df["prov_total"].sum()
+        prov.append(
+            trial_df["prov_valid_count"].sum() / prov_total if prov_total else 0
+        )
+
+        filter_rows = trial_df[trial_df["filter_tp"].notna()].drop_duplicates(
+            "filter_op_id"
+        )
+        tp = int(filter_rows["filter_tp"].sum())
+        fp = int(filter_rows["filter_fp"].sum())
+        fn = int(filter_rows["filter_fn"].sum())
+        p, r, f = compute_precision_recall_f1(tp, fp, fn)
+        filter_p.append(p)
+        filter_r.append(r)
+        filter_f1.append(f)
+
+        map_rows = trial_df[trial_df["map_total"].notna()].drop_duplicates("map_op_id")
+        map_total = map_rows["map_total"].sum()
+        map_acc.append(map_rows["map_correct"].sum() / map_total if map_total else 0)
+
+    return {
+        "Provenance Precision": _mean_range(prov, FormatType.SCORE),
+        "Filter Precision": _mean_range(filter_p, FormatType.SCORE),
+        "Filter Recall": _mean_range(filter_r, FormatType.SCORE),
+        "Filter F1 Score": _mean_range(filter_f1, FormatType.SCORE),
+        "Map Accuracy": _mean_range(map_acc, FormatType.SCORE),
+    }
+
+
+def _latex_results_tabular(
     df: pd.DataFrame,
-    impls: list[str] | None = None,
-    filename: str = "verification_quality",
-    labels: dict[str, str] | None = None,
-) -> None:
-    """Plot verification precision/recall/f1 compared to evg_ref."""
-    label_map = labels if labels is not None else IMPL_MODEL_LABELS
-    reference = df[df["implementation"] == "evg_ref"].set_index("claim")[
-        "verification_result"
+    impls: list[str],
+    columns: list[str],
+    cell_fn: Callable[[pd.DataFrame, str], dict[str, str]],
+    col_spec: str,
+) -> str:
+    """Render a ``tabular`` body grouping implementations by row with ``\\multirow``."""
+    header = " & ".join(["Implementation", "LLM", *columns])
+    lines = [
+        f"\\begin{{tabular}}{{{col_spec}}}",
+        "  \\toprule",
+        f"  {header} \\\\",
+        "  \\midrule",
     ]
-    rows: list[dict[str, object]] = []
+    for impl_index, impl in enumerate(impls):
+        impl_models = get_impl_models(df, impls=[impl])
+        if not impl_models:
+            continue
+        macro = LATEX_IMPL_MACROS[impl]
+        lines.append(f"    \\multirow{{{len(impl_models)}}}{{*}}{{{macro}}}")
+        for impl_model in impl_models:
+            model = impl_model[len(impl) + 1 :]
+            cells = cell_fn(df, impl_model)
+            values = " & ".join(cells[column] for column in columns)
+            lines.append(f"      & {LATEX_MODEL_NAMES[model]} & {values} \\\\")
+        if impl_index != len(impls) - 1:
+            lines.append("  \\addlinespace")
+    lines += ["  \\bottomrule", "\\end{tabular}"]
+    return "\n".join(lines) + "\n"
 
-    impl_models = get_impl_models(df, impls=impls, labels=label_map)
-    for impl_model in impl_models:
-        impl_df = df[df["impl_model"] == impl_model]
-        label = label_map[impl_model]
-        for trial_id in impl_df["trial_id"].unique():
-            trial_df = impl_df[impl_df["trial_id"] == int(trial_id)].set_index("claim")[
-                "verification_result"
-            ]
-            common = reference.index.intersection(trial_df.index)
-            ref, pred = reference.loc[common], trial_df.loc[common]
 
-            tp = (~ref & ~pred).sum()
-            fp = (ref & ~pred).sum()
-            fn = (~ref & pred).sum()
-
-            precision, recall, f1 = compute_precision_recall_f1(tp, fp, fn)
-            accuracy = (ref == pred).sum() / len(common) if len(common) else 0
-
-            for metric, value in [
-                ("precision", precision),
-                ("recall", recall),
-                ("f1", f1),
-                ("accuracy", accuracy),
-            ]:
-                rows.append({"impl_model": label, "metric": metric, "value": value})
-
-    ordered = [label_map[m] for m in impl_models]
-    plot_precision_recall_f1(
-        rows,
-        ylabel="verification score",
-        order=ordered,
-        filename=filename,
+def save_verification_results_table(df: pd.DataFrame) -> None:
+    """Emit the verification quality/cost/latency tabular to figures/."""
+    reference = get_reference(df)
+    columns = [
+        "Precision",
+        "Recall",
+        "F1 Score",
+        "Accuracy",
+        "Cost (\\$)",
+        "Latency (s)",
+    ]
+    tabular = _latex_results_tabular(
+        df,
+        ["base_rm", "rag_agent", "rlm", "evg_unopt", "evg_opt"],
+        columns,
+        lambda data, impl_model: _verification_cells(data, impl_model, reference),
+        "llcccccc",
     )
-    save_table(
-        pd.DataFrame(rows),
-        "value",
-        ["impl_model", "metric"],
-        filename,
-        FormatType.SCORE,
-        pivot_col="metric",
+    (FIGURES_DIR / "verification_results.tex").write_text(tabular)
+
+
+def save_component_quality_table(df: pd.DataFrame) -> None:
+    """Emit the provenance/filter/map operator-quality tabular to figures/."""
+    columns = [
+        "Provenance Precision",
+        "Filter Precision",
+        "Filter Recall",
+        "Filter F1 Score",
+        "Map Accuracy",
+    ]
+    tabular = _latex_results_tabular(
+        df,
+        ["evg_unopt_ref_query", "evg_opt_ref_query"],
+        columns,
+        _component_cells,
+        "llccccc",
     )
-
-
-def plot_filter_quality_aggregated(df: pd.DataFrame) -> None:
-    """Plot filter precision/recall/f1 aggregated across all claims."""
-    filtered = df[(df["implementation"] != "evg_ref") & df["filter_tp"].notna()]
-
-    agg = (
-        filtered.groupby(["impl_model", "trial_id"])[
-            ["filter_tp", "filter_fp", "filter_fn"]
-        ]
-        .sum()
-        .reset_index()
-    )
-    rows: list[dict[str, object]] = []
-
-    for _, row_data in agg.iterrows():
-        impl_model = row_data["impl_model"]
-        tp = int(row_data["filter_tp"])
-        fp = int(row_data["filter_fp"])
-        fn = int(row_data["filter_fn"])
-        precision, recall, f1 = compute_precision_recall_f1(tp, fp, fn)
-
-        for metric, value in [("precision", precision), ("recall", recall), ("f1", f1)]:
-            rows.append({"impl_model": impl_model, "metric": metric, "value": value})
-
-    plot_precision_recall_f1(
-        rows,
-        ylabel="filter score",
-        order=get_impl_models(df, impls=["evg_unopt", "evg_opt"]),
-        filename="filter_quality_aggregated",
-    )
-    save_table(
-        pd.DataFrame(rows),
-        "value",
-        ["impl_model", "metric"],
-        "filter_quality_aggregated",
-        FormatType.SCORE,
-        pivot_col="metric",
-    )
-
-
-def plot_map_accuracy_aggregated(df: pd.DataFrame) -> None:
-    """Plot map accuracy aggregated across all claims."""
-    filtered = df[(df["implementation"] != "evg_ref") & df["map_total"].notna()]
-
-    agg = (
-        filtered.groupby(["impl_model", "trial_id"])[["map_correct", "map_total"]]
-        .sum()
-        .reset_index()
-    )
-    rows: list[dict[str, object]] = []
-
-    for _, row_data in agg.iterrows():
-        impl_model = row_data["impl_model"]
-        correct = row_data["map_correct"]
-        total = row_data["map_total"]
-        accuracy = correct / total if total else 0  # type: ignore
-        rows.append({"impl_model": impl_model, "accuracy": accuracy})
-
-    _, axis = plt.subplots(figsize=FIGURE_SIZE)
-    sns.barplot(
-        data=pd.DataFrame(rows),
-        x="impl_model",
-        y="accuracy",
-        ax=axis,
-        order=get_impl_models(df, impls=["evg_unopt", "evg_opt"]),
-        errorbar=("pi", 100),
-        err_kws={"alpha": 0.5},
-    )
-    axis.set(xlabel="implementation", ylabel="accuracy")  # type: ignore
-    add_bar_labels(axis, FormatType.SCORE)
-    save_figure("map_accuracy_aggregated")
-    save_table(
-        pd.DataFrame(rows),
-        "accuracy",
-        ["impl_model"],
-        "map_accuracy_aggregated",
-        FormatType.SCORE,
-    )
+    (FIGURES_DIR / "component_quality.tex").write_text(tabular)
 
 
 def plot_verification_heatmap(df: pd.DataFrame) -> None:
-    """Plot heatmap showing correctness of each implementation vs reference.
-    Shows mean correctness across trials.
-    """
-    reference = df[df["implementation"] == "evg_ref"].set_index("claim")[
-        "verification_result"
-    ]
+    reference = get_reference(df)
 
     impl_models = get_impl_models(df)
     rows: list[dict[str, object]] = []
@@ -516,103 +720,36 @@ def plot_verification_heatmap(df: pd.DataFrame) -> None:
             )
 
     correctness_df = pd.DataFrame(rows)
-    # Average correctness across trials (1.0 = all correct, 0.0 = none correct)
-    pivot = correctness_df.groupby(["claim", "impl_model"])["correct"].mean().unstack()
-    # Reorder columns
-    pivot = pivot[[c for c in impl_models if c in pivot.columns]]
+    grouped = correctness_df.groupby(["claim", "impl_model"])["correct"]
+    # Color encodes the fraction correct; annotation shows the integer count of
+    # correct trials (out of the number of trials).
+    pivot = grouped.mean().unstack()
+    counts = grouped.sum().unstack()
 
-    pivot.index = [CLAIM_TO_CLAIM_ID[c] for c in pivot.index]
-    pivot.columns = [IMPL_MODEL_LABELS[c] for c in pivot.columns]
+    # Keep both matrices aligned through the same reordering/relabeling.
+    order = [c for c in impl_models if c in pivot.columns]
+    pivot, counts = pivot[order], counts[order]
 
-    _, axis = plt.subplots(figsize=(10, 3))
+    claim_ids = [CLAIM_TO_CLAIM_ID[c] for c in pivot.index]
+    pivot.index = counts.index = claim_ids
+    row_order = sorted(claim_ids, key=lambda c: int(c[1:]))
+    pivot, counts = pivot.reindex(row_order), counts.reindex(row_order)
+
+    labels = [IMPL_MODEL_LABELS[c] for c in order]
+    pivot.columns = counts.columns = labels
+
+    _, axis = plt.subplots(figsize=(7.0, 2))
     sns.heatmap(
         pivot.T,
-        annot=True,
+        annot=counts.T.astype(int),
+        fmt="d",
         ax=axis,
         vmin=0,
         vmax=1,
-        fmt=".2f",
         cbar=False,
     )  # type: ignore
     axis.set(xlabel="Claim", ylabel="Implementation")  # type: ignore
     save_figure("verification_result")
-
-
-def plot_mean_aggregated(
-    df: pd.DataFrame,
-    column: str,
-    ylabel: str,
-    filename: str,
-    format_type: FormatType,
-    impls: list[str] | None = None,
-    labels: dict[str, str] | None = None,
-) -> None:
-    """Plot average of a metric per claim across implementations."""
-    label_map = labels if labels is not None else IMPL_MODEL_LABELS
-    impl_models = get_impl_models(df, impls=impls, labels=label_map)
-    filtered = df[df["impl_model"].isin(impl_models)]
-
-    agg = filtered.groupby(["impl_model", "trial_id"])[column].mean().reset_index()
-    agg.columns = ["impl_model", "trial_id", column]
-    agg["impl_model"] = agg["impl_model"].map(label_map)
-    ordered = [label_map[m] for m in impl_models]
-    agg["impl_model"] = pd.Categorical(
-        agg["impl_model"], categories=ordered, ordered=True
-    )
-    agg = agg.sort_values("impl_model")
-
-    _, axis = plt.subplots(figsize=FIGURE_SIZE)
-    sns.barplot(
-        data=agg,
-        x="impl_model",
-        y=column,
-        ax=axis,
-        errorbar=("pi", 100),
-        err_kws={"alpha": 0.5},
-    )
-    axis.set(xlabel="implementation", ylabel=ylabel)  # type: ignore
-    add_bar_labels(axis, format_type)
-    save_figure(filename)
-    save_table(agg, column, ["impl_model"], filename, format_type)
-
-
-def plot_provenance_precision_aggregated(df: pd.DataFrame) -> None:
-    """Plot provenance precision micro-averaged across all claims."""
-    filtered = df[(df["implementation"] != "evg_ref") & df["prov_total"].notna()]
-
-    agg = (
-        filtered.groupby(["impl_model", "trial_id"])[["prov_valid_count", "prov_total"]]
-        .sum()
-        .reset_index()
-    )
-    agg["provenance_precision"] = agg["prov_valid_count"] / agg["prov_total"]
-
-    impl_models = get_impl_models(df, impls=["evg_unopt", "evg_opt"])
-    agg = agg[agg["impl_model"].isin(impl_models)]
-    agg["impl_model"] = pd.Categorical(
-        agg["impl_model"], categories=impl_models, ordered=True
-    )
-    agg = agg.sort_values("impl_model")
-
-    _, axis = plt.subplots(figsize=FIGURE_SIZE)
-    sns.barplot(
-        data=agg,
-        x="impl_model",
-        y="provenance_precision",
-        ax=axis,
-        errorbar=("pi", 100),
-        err_kws={"alpha": 0.5},
-    )
-    axis.set(xlabel="implementation", ylabel="provenance precision")  # type: ignore
-    add_bar_labels(axis, FormatType.SCORE)
-    save_figure("provenance_precision_aggregated")
-    save_table(
-        agg,
-        "provenance_precision",
-        ["impl_model"],
-        "provenance_precision_aggregated",
-        FormatType.SCORE,
-    )
 
 
 def plot_metric(
@@ -620,32 +757,44 @@ def plot_metric(
     column: str,
     ylabel: str,
     filename: str,
-    format_type: FormatType,
     log_scale: bool = False,
-    include_ref: bool = False,
     impls: list[str] | None = None,
 ) -> None:
-    """Plot a metric per claim grouped by impl_model."""
-    filtered = df[df[column].notna()]
-    if not include_ref:
-        filtered = filtered[filtered["implementation"] != "evg_ref"]
-
+    """Plot a metric per claim grouped by implementation."""
     impl_models = get_impl_models(df, impls)
+    filtered = df[df[column].notna() & df["impl_model"].isin(impl_models)].copy()
+    filtered["impl_label"] = filtered["impl_model"].map(IMPL_MODEL_LABELS)
+    filtered["claim_id"] = filtered["claim"].map(CLAIM_TO_CLAIM_ID)
 
-    _, axis = plt.subplots(figsize=FIGURE_SIZE)
-    sns.barplot(
-        data=filtered,
-        x="claim",
-        y=column,
-        hue="impl_model",
-        hue_order=impl_models,
-        ax=axis,
-        errorbar=("pi", 100),
-        err_kws={"alpha": 0.5},
+    hue_order = [IMPL_MODEL_LABELS[m] for m in impl_models]
+    claim_order = sorted(filtered["claim_id"].unique(), key=lambda c: int(c[1:]))
+
+    # Split claims across two stacked rows so each bar has room to breathe.
+    half = (len(claim_order) + 1) // 2
+    claim_rows = [claim_order[:half], claim_order[half:]]
+
+    _, axes = plt.subplots(
+        2, 1, figsize=(FIGURE_SIZE[0] / 2, FIGURE_SIZE[1] * 2), sharey=True
     )
-    axis.set(ylabel=ylabel, yscale="symlog" if log_scale else "linear")  # type: ignore
-    axis.legend(title="implementation")  # type: ignore
-    add_bar_labels(axis, format_type, rotation=30)
+    for i, (axis, claims_subset) in enumerate(zip(axes, claim_rows, strict=True)):
+        sns.barplot(
+            data=filtered[filtered["claim_id"].isin(claims_subset)],
+            x="claim_id",
+            y=column,
+            hue="impl_label",
+            hue_order=hue_order,
+            order=claims_subset,
+            ax=axis,
+            errorbar=("pi", 100),
+            err_kws={"alpha": 0.5},
+        )
+        axis.set(  # type: ignore
+            xlabel="claim", ylabel=ylabel, yscale="symlog" if log_scale else "linear"
+        )
+        if i == 0:
+            axis.legend(title="implementation")  # type: ignore
+        elif axis.get_legend() is not None:
+            axis.get_legend().remove()
     save_figure(filename)
 
 
@@ -663,20 +812,14 @@ def plot_ablation_quality(df: pd.DataFrame) -> None:
                 rows_q.append({"precision": 0.0, "recall": 0.0, "f1": 0.0})
                 continue
             r, p = ref.loc[common], trial.loc[common]
-            tp = (~r & ~p).sum()
-            fp = (r & ~p).sum()
-            fn = (~r & p).sum()
+            tp, fp, fn = hallucination_counts(r, p)
             precision, recall, f1 = compute_precision_recall_f1(tp, fp, fn)
             rows_q.append({"precision": precision, "recall": recall, "f1": f1})
         return pd.DataFrame(rows_q)
 
-    ablation_df = df[
-        (df["model"] == ABLATION_MODEL) | (df["implementation"] == "evg_ref")
-    ]
-    reference = ablation_df[ablation_df["implementation"] == "evg_ref"].set_index(
-        "claim"
-    )["verification_result"]
-    baseline_key = f"evg_opt_{ABLATION_MODEL}"
+    ablation_df = get_ablation_df(df)
+    reference = get_reference(ablation_df)
+    baseline_key = f"evg_opt_ref_query_{ABLATION_MODEL}"
 
     rows: list[dict[str, object]] = []
 
@@ -752,67 +895,76 @@ def plot_ablation_quality(df: pd.DataFrame) -> None:
     table.to_csv(FIGURES_DIR / "ablation_quality.csv", index=False)
 
 
-def plot_ablation_cost_and_latency(df: pd.DataFrame) -> None:
-    """Plot cost and latency multipliers (No X / All Opt) over applicable claims."""
-    ablation_df = df[
-        (df["model"] == ABLATION_MODEL) | (df["implementation"] == "evg_ref")
+def plot_ablation_cost(df: pd.DataFrame) -> None:
+    """Plot per-claim cost multipliers (No X / All Opt) over applicable claims."""
+    ablation_df = get_ablation_df(df)
+    baseline_key = f"evg_opt_ref_query_{ABLATION_MODEL}"
+    steps = [
+        (impl, label)
+        for impl, label in _ABLATION_STEP_LABELS.items()
+        if impl not in ("evg_opt", "evg_abl_no_pc")
     ]
-    baseline_key = f"evg_opt_{ABLATION_MODEL}"
-    label_order = [v for k, v in _ABLATION_STEP_LABELS.items() if k != "evg_opt"]
 
-    _, (ax_cost, ax_latency) = plt.subplots(1, 2, figsize=(5, 2.5))
+    rng = np.random.default_rng(0)
+    _, axis = plt.subplots(figsize=(2.24, 1.2))
+    col_name = "total_token_cost"
 
-    for metric, col_name, axis in [
-        ("Cost", "total_token_cost", ax_cost),
-        ("Latency", "latency", ax_latency),
-    ]:
-        rows: list[dict[str, object]] = []
+    for x_pos, (impl, _label) in enumerate(steps):
+        abl_key = f"{impl}_{ABLATION_MODEL}"
+        finite: list[float] = []
 
-        for impl, label in _ABLATION_STEP_LABELS.items():
-            if impl == "evg_opt":
+        for cid in ABLATION_APPLICABLE_CLAIMS[impl]:
+            claim = CLAIM_ID_TO_CLAIM[cid]
+            base = ablation_df[
+                (ablation_df["impl_model"] == baseline_key)
+                & (ablation_df["claim"] == claim)
+            ]
+            abl = ablation_df[
+                (ablation_df["impl_model"] == abl_key) & (ablation_df["claim"] == claim)
+            ]
+            if base.empty or abl.empty:
                 continue
 
-            abl_key = f"{impl}_{ABLATION_MODEL}"
-            claim_ids = ABLATION_APPLICABLE_CLAIMS[impl]
-            claims = {CLAIM_ID_TO_CLAIM[c] for c in claim_ids}
-            sub = ablation_df[ablation_df["claim"].isin(claims)]
+            # Average across trials on each side, then take the ratio.
+            base_mean = base[col_name].mean()
+            abl_mean = abl[col_name].mean()
+            if base_mean <= 0 or abl_mean <= 0:
+                continue
+            finite.append(abl_mean / base_mean)
 
-            base = sub[sub["impl_model"] == baseline_key]
-            abl = sub[sub["impl_model"] == abl_key]
-
-            base_means = base.groupby("trial_id")[col_name].mean()
-            abl_means = abl.groupby("trial_id")[col_name].mean()
-            multiplier = abl_means / base_means
-
-            for trial_id, val in multiplier.items():
-                rows.append(
-                    {
-                        "Implementation": label,
-                        "trial_id": trial_id,
-                        col_name: val,
-                    }
-                )
-
-        agg = pd.DataFrame(rows)
-        agg["Implementation"] = pd.Categorical(
-            agg["Implementation"], categories=label_order, ordered=True
+        jitter = rng.uniform(-0.15, 0.15, size=len(finite))
+        axis.scatter(
+            np.full(len(finite), x_pos) + jitter,
+            finite,
+            s=4,
+            alpha=0.5,
+            zorder=3,
         )
-        agg = agg.sort_values("Implementation")
+        if finite:
+            geo_mean = float(np.exp(np.mean(np.log(finite))))
+            axis.plot(
+                [x_pos - 0.2, x_pos + 0.2],
+                [geo_mean, geo_mean],
+                color="black",
+                linewidth=1,
+                zorder=4,
+            )
+            axis.text(
+                x_pos,
+                geo_mean * 1.05,
+                f"{geo_mean:.1f}",
+                ha="center",
+                va="bottom",
+                zorder=4,
+            )
 
-        sns.barplot(
-            data=agg,
-            x="Implementation",
-            y=col_name,
-            ax=axis,
-            errorbar=("pi", 100),
-            err_kws={"alpha": 0.5},
-        )
-        axis.axhline(y=1.0, color="gray", linestyle="--", linewidth=1)
-        axis.set(xlabel="Implementation", ylabel=f"{metric} Multiplier")
-        axis.tick_params(axis="x", rotation=45)
-        add_bar_labels(axis, FormatType.MULTIPLIER)
+    axis.axhline(y=1.0, color="gray", linestyle="--", linewidth=1)
+    axis.set_yscale("log")
+    axis.set_xticks(range(len(steps)))
+    axis.set_xticklabels([label for _, label in steps])
+    axis.set(xlabel="Implementation", ylabel="Cost Multiplier")
 
-    save_figure("ablation_cost_and_latency")
+    save_figure("ablation_cost")
 
 
 def load_sim_filter_results() -> pd.DataFrame:
@@ -853,7 +1005,8 @@ def plot_sim_filter_sensitivity() -> None:
 
     claim_order = sorted(sim_filter_df["claim_id"].unique(), key=lambda c: int(c[1:]))
 
-    _, (ax_recall, ax_filter_rate) = plt.subplots(1, 2, figsize=(5, 2), sharex=True)
+    fig_recall, ax_recall = plt.subplots(figsize=(2.24, 1.2))
+    fig_rate, ax_filter_rate = plt.subplots(figsize=(2.24, 1.2))
 
     for claim_id in claim_order:
         claim_df = sim_filter_df[sim_filter_df["claim_id"] == claim_id].sort_values(
@@ -862,7 +1015,11 @@ def plot_sim_filter_sensitivity() -> None:
         thresholds = claim_df["threshold"]
 
         (line_recall,) = ax_recall.plot(
-            thresholds, claim_df["recall_mean"], marker="o", label=claim_id
+            thresholds,
+            claim_df["recall_mean"],
+            marker="o",
+            markersize=2,
+            label=claim_id,
         )
         ax_recall.fill_between(
             thresholds,
@@ -876,6 +1033,7 @@ def plot_sim_filter_sensitivity() -> None:
             thresholds,
             claim_df["filter_rate_mean"],
             marker="o",
+            markersize=2,
             label=claim_id,
         )
         ax_filter_rate.fill_between(
@@ -892,22 +1050,23 @@ def plot_sim_filter_sensitivity() -> None:
         ax.set_xlabel("Similarity Threshold")
 
     ax_recall.set_ylabel("Recall")
+    ax_recall.legend()
     ax_filter_rate.set_ylabel("Filter Rate")
-    ax_filter_rate.legend(fontsize="xx-small")
 
-    save_figure("sim_filter_sensitivity")
+    for fig, name in ((fig_recall, "sim_filter_recall"), (fig_rate, "sim_filter_rate")):
+        fig.tight_layout()
+        fig.savefig(FIGURES_DIR / f"{name}.pdf")
+        plt.close(fig)
     sim_filter_df.to_csv(FIGURES_DIR / "sim_filter_sensitivity.csv", index=False)
 
 
 def plot_ablation_per_claim(df: pd.DataFrame) -> None:
-    """Save per-claim cost/latency/correctness for each ablation vs evg_opt."""
-    ablation_df = df[
-        (df["model"] == ABLATION_MODEL) | (df["implementation"] == "evg_ref")
-    ]
-    baseline_key = f"evg_opt_{ABLATION_MODEL}"
-    reference = ablation_df[ablation_df["implementation"] == "evg_ref"].set_index(
-        "claim"
-    )["verification_result"]
+    """
+    Save per-claim cost/latency/correctness for each ablation vs evg_opt_ref_query.
+    """
+    ablation_df = get_ablation_df(df)
+    baseline_key = f"evg_opt_ref_query_{ABLATION_MODEL}"
+    reference = get_reference(ablation_df)
 
     rows: list[dict[str, object]] = []
     for impl, label in _ABLATION_STEP_LABELS.items():
@@ -924,7 +1083,7 @@ def plot_ablation_per_claim(df: pd.DataFrame) -> None:
             abl = ablation_df[
                 (ablation_df["impl_model"] == abl_key) & (ablation_df["claim"] == claim)
             ]
-            ref_val = reference.get(claim)
+            ref_val = reference[claim]
             opt_correct = (base["verification_result"] == ref_val).sum()
             abl_correct = (abl["verification_result"] == ref_val).sum()
             n_trials = len(base)
@@ -961,9 +1120,7 @@ def plot_ablation_per_claim(df: pd.DataFrame) -> None:
 
 def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
     """Scatter plot of mean F1 vs mean cost per claim, with Pareto frontier."""
-    reference = df[df["implementation"] == "evg_ref"].set_index("claim")[
-        "verification_result"
-    ]
+    reference = get_reference(df)
 
     # Aggregate F1 and cost per implementation–model pair across trials.
     records: list[dict[str, Any]] = []
@@ -979,9 +1136,7 @@ def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
             trial_claims = trial_df.set_index("claim")["verification_result"]
             common = reference.index.intersection(trial_claims.index)
             ref, pred = reference.loc[common], trial_claims.loc[common]
-            tp = (~ref & ~pred).sum()
-            fp = (ref & ~pred).sum()
-            fn = (~ref & pred).sum()
+            tp, fp, fn = hallucination_counts(ref, pred)
             _, _, f1 = compute_precision_recall_f1(tp, fp, fn)
             trial_f1s.append(f1)
             trial_costs.append(trial_df["total_token_cost"].mean())
@@ -1013,10 +1168,10 @@ def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
                 is_pareto[i] = False
                 break
 
-    _, ax = plt.subplots(figsize=(5, 2.5))
+    _, ax = plt.subplots(figsize=(3.33, 1.8))
 
-    markers = ["o", "s", "D", "^"]
-    colors = ["C0", "C1", "C3", "C2"]  # make evg_opt green
+    markers = ["o", "s", "p", "D", "^"]
+    colors = ["C0", "C1", "C4", "C3", "C2"]  # make evg_opt green
 
     for impl, marker, color in zip(IMPLEMENTATIONS, markers, colors, strict=True):
         subset = points[points["implementation"] == impl]
@@ -1027,6 +1182,7 @@ def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
             subset["f1"],
             label=impl,
             marker=marker,
+            s=10,
             color=color,
         )
 
@@ -1035,9 +1191,8 @@ def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
             _MODEL_LABELS[row["model"]],
             (row["cost"], row["f1"]),
             textcoords="offset points",
-            xytext=(0, 5),
+            xytext=(0, 3),
             ha="center",
-            fontsize="x-small",
         )
 
     pareto_points = points[is_pareto].sort_values("cost")
@@ -1052,11 +1207,38 @@ def plot_cost_f1_pareto(df: pd.DataFrame) -> None:
     ax.set_xscale("log")
     ax.set_xlabel("Cost ($)")
     ax.set_ylabel("F1 Score")
-    ax.set_xlim(0.017, 19)
-    ax.set_ylim(0.7, 1.04)
-    ax.legend(fontsize="x-small")
+    ax.set_xlim(0.06, 25)
+    ax.set_ylim(0.69, 1)
+    ax.legend()
 
     save_figure("cost_f1_pareto")
+
+
+def save_compilation_summary() -> None:
+    comp = load_compilation_costs()
+    comp_df = pd.DataFrame(
+        [
+            {"claim": claim, "trial_id": trial_id, **vals}
+            for (claim, trial_id), vals in comp.items()
+        ]
+    )
+    per_claim = comp_df.groupby("claim")[["total_token_cost", "latency"]].mean()
+
+    summary = pd.DataFrame(
+        [
+            {
+                "Metric": label,
+                "Mean": per_claim[col].mean(),
+                "Std": per_claim[col].std(),  # pandas std uses ddof=1
+                "N": int(per_claim[col].count()),
+            }
+            for label, col in [
+                ("Cost ($)", "total_token_cost"),
+                ("Latency (s)", "latency"),
+            ]
+        ]
+    )
+    summary.to_csv(FIGURES_DIR / "compilation_summary.csv", index=False)
 
 
 def main() -> None:
@@ -1064,6 +1246,17 @@ def main() -> None:
 
     sns.set_theme(style="whitegrid")
     sns.set_palette("colorblind")
+    # Paper figures are authored at their exact on-page width (scale 1 in LaTeX),
+    # so these absolute point sizes render identically across every figure.
+    plt.rcParams.update(
+        {
+            "font.size": 6,
+            "axes.labelsize": 7,
+            "xtick.labelsize": 6,
+            "ytick.labelsize": 6,
+            "legend.fontsize": 6,
+        }
+    )
 
     df = load_results()
     print(f"Loaded {len(df)} results")
@@ -1076,30 +1269,19 @@ def main() -> None:
         ].to_string(index=False)
     )
 
+    # Compilation metrics
+    save_compilation_summary()
+
+    # Result tables (LaTeX tabular bodies)
+    save_verification_results_table(df)
+    save_component_quality_table(df)
+
     # Summary plots (aggregated across claims)
-    plot_verification_quality(df)
     plot_cost_f1_pareto(df)
-    plot_provenance_precision_aggregated(df)
-    plot_filter_quality_aggregated(df)
-    plot_map_accuracy_aggregated(df)
-    plot_mean_aggregated(
-        df,
-        "total_token_cost",
-        "avg. token cost per claim ($)",
-        "total_token_cost_aggregated",
-        FormatType.COST,
-    )
-    plot_mean_aggregated(
-        df,
-        "latency",
-        "avg. latency per claim (s)",
-        "latency_aggregated",
-        FormatType.LATENCY,
-    )
 
     # Ablations
     plot_ablation_quality(df)
-    plot_ablation_cost_and_latency(df)
+    plot_ablation_cost(df)
     plot_ablation_per_claim(df)
 
     # Sensitivity analysis
@@ -1112,87 +1294,41 @@ def main() -> None:
         column="filter_precision",
         ylabel="filter precision",
         filename="filter_precision",
-        format_type=FormatType.SCORE,
-        impls=["evg_unopt", "evg_opt"],
+        impls=REF_QUERY_IMPLEMENTATIONS,
     )
     plot_metric(
         df,
         column="filter_recall",
         ylabel="filter recall",
         filename="filter_recall",
-        format_type=FormatType.SCORE,
-        impls=["evg_unopt", "evg_opt"],
+        impls=REF_QUERY_IMPLEMENTATIONS,
     )
     plot_metric(
         df,
         column="filter_f1",
         ylabel="filter f1 score",
         filename="filter_f1",
-        format_type=FormatType.SCORE,
-        impls=["evg_unopt", "evg_opt"],
+        impls=REF_QUERY_IMPLEMENTATIONS,
     )
     plot_metric(
         df,
         column="map_accuracy",
         ylabel="map accuracy",
         filename="map_accuracy",
-        format_type=FormatType.SCORE,
-        impls=["evg_unopt", "evg_opt"],
+        impls=REF_QUERY_IMPLEMENTATIONS,
     )
     plot_metric(
         df,
         column="provenance_precision",
         ylabel="provenance precision",
         filename="provenance_precision",
-        format_type=FormatType.SCORE,
-        impls=["evg_unopt", "evg_opt"],
-    )
-    plot_metric(
-        df,
-        column="lm_call_count",
-        ylabel="LM call count",
-        filename="lm_call_count",
-        format_type=FormatType.COUNT,
-        log_scale=True,
-    )
-    plot_metric(
-        df,
-        column="input_token_count",
-        ylabel="input token count",
-        filename="input_token_count",
-        format_type=FormatType.TOKENS,
-        log_scale=True,
-    )
-    plot_metric(
-        df,
-        column="output_token_count",
-        ylabel="output token count",
-        filename="output_token_count",
-        format_type=FormatType.TOKENS,
-        log_scale=True,
-    )
-    plot_metric(
-        df,
-        column="input_token_cost",
-        ylabel="input token cost ($)",
-        filename="input_token_cost",
-        format_type=FormatType.COST,
-        log_scale=True,
-    )
-    plot_metric(
-        df,
-        column="output_token_cost",
-        ylabel="output token cost ($)",
-        filename="output_token_cost",
-        format_type=FormatType.COST,
-        log_scale=True,
+        impls=REF_QUERY_IMPLEMENTATIONS,
     )
     plot_metric(
         df,
         column="total_token_cost",
         ylabel="total token cost ($)",
         filename="total_token_cost",
-        format_type=FormatType.COST,
         log_scale=True,
     )
     plot_metric(
@@ -1200,7 +1336,6 @@ def main() -> None:
         column="latency",
         ylabel="latency (s)",
         filename="latency",
-        format_type=FormatType.LATENCY,
         log_scale=True,
     )
 
@@ -1208,14 +1343,18 @@ def main() -> None:
 
     if PAPER_DIR.is_dir():
         PAPER_FIGURES_DIR.mkdir(exist_ok=True)
-        for pdf in FIGURES_DIR.glob("*.pdf"):
-            if pdf.name in {
-                "verification_result.pdf",
-                "ablation_cost_and_latency.pdf",
-                "sim_filter_sensitivity.pdf",
-                "cost_f1_pareto.pdf",
-            }:
-                shutil.copy2(pdf, PAPER_FIGURES_DIR / pdf.name)
+        paper_assets = {
+            "verification_result.pdf",
+            "ablation_cost.pdf",
+            "sim_filter_recall.pdf",
+            "sim_filter_rate.pdf",
+            "cost_f1_pareto.pdf",
+            "verification_results.tex",
+            "component_quality.tex",
+        }
+        for asset in FIGURES_DIR.iterdir():
+            if asset.name in paper_assets:
+                shutil.copy2(asset, PAPER_FIGURES_DIR / asset.name)
         print(f"Figures copied to {PAPER_FIGURES_DIR}")
 
 

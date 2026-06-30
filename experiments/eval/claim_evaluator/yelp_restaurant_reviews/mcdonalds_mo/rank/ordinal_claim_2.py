@@ -1,17 +1,34 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, prompt, proportion
+from evergreen.planner.logical.expr import col, prompt, proportion
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class OrdinalClaim2Evaluator(ClaimEvaluator):
-    def query(
+    NAME = "ordinal_claim_2"
+    CLAIM = (
+        "The McDonald's location ranked #2 in terms of service has the "
+        "Business ID oLV14RPXy_gCS9gvlAofSg."
+    )
+    HINTS = (
+        "Rank based on, among the reviews that mention the service, the "
+        "proportion that speak positively about the service."
+    )
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/rank_2026-02-20_20-01-21.json"
+    )
+    CACHE_ID = "ordinal_claims_1_and_2"
+
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -26,11 +43,15 @@ class OrdinalClaim2Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .filter(prompt("The {text} mentions the service at the restaurant"))
+            .filter(
+                prompt(
+                    "The restaurant review {text} describes the restaurant's service"
+                )
+            )
             .map(
                 prompt(
-                    "Identify whether the {text} praises or speaks positively about "
-                    "the service at the restaurant",
+                    "Identify whether the restaurant review {text} praises the "
+                    "restaurant's service",
                     bool,
                 ).alias("praises_service")
             )
@@ -46,32 +67,10 @@ class OrdinalClaim2Evaluator(ClaimEvaluator):
                 group_by=[col("business_id")],
             )
             .with_rank(col("service_praise_prop"))
-            .filter(col("business_id").eq("9eYm5gwEOhBQdkg9ihV7EA"))
+            .filter(col("business_id").eq("oLV14RPXy_gCS9gvlAofSg"))
             .check(col("rank").eq(2))
-        )
-
-    def check_predicate(self) -> Expr:
-        return col("rank").eq(2)
-
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("praises_service"),)
-
-    def hints(self) -> str:
-        return (
-            "Rank based on the proportion of reviews that speak positively about "
-            "the service at each restaurant."
         )
 
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = OrdinalClaim2Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/mcdonalds_mo/rank/ordinal_claim_2_2026-02-22_11-31-49.json"
-        ),
-        dataset_key=("review_id",),
-        text_field_name="text",
-        random_seed=42,
-        cache_id="ordinal_claims_1_and_2",
-    )
-    claim_evaluator.evaluate(args)
+    OrdinalClaim2Evaluator().evaluate(parse_claim_evaluator_args())

@@ -62,41 +62,68 @@ class TestCortexEmbeddingModel:
         assert model.metrics()[0].embed_count == 3
         assert model.metrics()[0].embed_cache_hit_count == 0
 
-    def test_embed_with_sentences(self):
+    def test_embed_with_sentences_batch(self):
         model_config = CortexModelConfig(
             [DEFAULT_LANGUAGE_MODEL], DEFAULT_EMBEDDING_MODEL, DEFAULT_CONNECTION_NAME
         )
         model = model_config.create_embedding_model(
             cache_dir=CACHE_DIR_ROOT / uuid.uuid4().hex
         )
-        text = "This is the first sentence. This is the second sentence."
-        doc_embedding, sentence_embeddings = model.embed_with_sentences(text)
+        texts = [
+            "This is the first sentence. This is the second sentence.",
+            "Only one sentence here.",
+            "First. Second. Third.",
+        ]
+        expected_sentence_counts = [2, 1, 3]
 
-        # Doc embedding
-        assert len(doc_embedding) == 1024
-        assert np.isclose(np.linalg.norm(doc_embedding), 1.0)
+        results = model.embed_with_sentences_batch(texts)
 
-        # Sentence embeddings (should be 2 sentences)
-        assert len(sentence_embeddings) == 2
-        for sentence_embedding in sentence_embeddings:
-            assert len(sentence_embedding) == 1024
-            assert np.isclose(np.linalg.norm(sentence_embedding), 1.0)
+        assert len(results) == len(texts)
+        for (doc_embedding, sentence_embeddings), expected_count in zip(
+            results, expected_sentence_counts, strict=True
+        ):
+            # Doc embedding
+            assert len(doc_embedding) == 1024
+            assert np.isclose(np.linalg.norm(doc_embedding), 1.0)
 
-        # 1 doc embed + 2 sentence embeds = 3 total
-        assert model.metrics()[0].embed_count == 3
+            # Sentence embeddings regrouped to the correct text
+            assert len(sentence_embeddings) == expected_count
+            for sentence_embedding in sentence_embeddings:
+                assert len(sentence_embedding) == 1024
+                assert np.isclose(np.linalg.norm(sentence_embedding), 1.0)
 
-    def test_embed_with_sentences_empty(self):
+        # 3 doc embeds + (2 + 1 + 3) sentence embeds = 9 total
+        assert model.metrics()[0].embed_count == 9
+
+    def test_embed_with_sentences_batch_empty_input(self):
         model_config = CortexModelConfig(
             [DEFAULT_LANGUAGE_MODEL], DEFAULT_EMBEDDING_MODEL, DEFAULT_CONNECTION_NAME
         )
         model = model_config.create_embedding_model(
             cache_dir=CACHE_DIR_ROOT / uuid.uuid4().hex
         )
-        text = ""
-        doc_embedding, sentence_embeddings = model.embed_with_sentences(text)
 
-        # Doc embedding still exists (for empty string)
-        assert len(doc_embedding) == 1024
+        assert model.embed_with_sentences_batch([]) == []
+        assert model.metrics()[0].embed_count == 0
 
-        # No sentences
-        assert sentence_embeddings == []
+    def test_embed_with_sentences_batch_empty_string(self):
+        model_config = CortexModelConfig(
+            [DEFAULT_LANGUAGE_MODEL], DEFAULT_EMBEDDING_MODEL, DEFAULT_CONNECTION_NAME
+        )
+        model = model_config.create_embedding_model(
+            cache_dir=CACHE_DIR_ROOT / uuid.uuid4().hex
+        )
+        # An empty string contributes zero sentences; it must not shift the
+        # offsets of subsequent texts.
+        texts = ["A sentence here.", "", "First. Second."]
+        expected_sentence_counts = [1, 0, 2]
+
+        results = model.embed_with_sentences_batch(texts)
+
+        assert len(results) == len(texts)
+        for (doc_embedding, sentence_embeddings), expected_count in zip(
+            results, expected_sentence_counts, strict=True
+        ):
+            # Doc embedding exists even for the empty string
+            assert len(doc_embedding) == 1024
+            assert len(sentence_embeddings) == expected_count

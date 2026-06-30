@@ -6,7 +6,11 @@ from pathlib import Path
 from snowflake.snowpark import Session
 
 from evergreen.claim_decomposer import ClaimDecomposer
-from evergreen.common.constants import EMBEDDING_FIELD_SUFFIX, JSON_INDENT
+from evergreen.common.constants import (
+    EMBEDDING_FIELD_SUFFIX,
+    JSON_INDENT,
+    SENTENCE_EMBEDDINGS_FIELD_SUFFIX,
+)
 from evergreen.model.config import CortexModelConfig
 from experiments.common import (
     CONNECTION_NAME,
@@ -69,6 +73,7 @@ class SemanticAggregate:
                     k: v
                     for k, v in obj.items()
                     if not k.endswith(EMBEDDING_FIELD_SUFFIX)
+                    and not k.endswith(SENTENCE_EMBEDDINGS_FIELD_SUFFIX)
                 }
                 if not schema:
                     schema = list(filtered_obj.keys())

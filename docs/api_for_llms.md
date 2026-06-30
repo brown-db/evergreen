@@ -2,7 +2,6 @@ The below is documentation specifically for an LLM to consume.
 
 ::: evergreen.col
 ::: evergreen.lit
-::: evergreen.contains
 ::: evergreen.prompt
 ::: evergreen.count_if
 ::: evergreen.proportion
@@ -40,7 +39,7 @@ Check if some movie reviews mention beautiful cinematography:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} mentions beautiful cinematography", bool
+...             "Identify whether the movie {review} mentions the movie's beautiful cinematography", bool
 ...         ).alias("mentions_beautiful_cinematography")
 ...     )
 ...     .aggregate(
@@ -56,7 +55,7 @@ Check if all movies have majority positive reviews:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} has a positive sentiment towards the movie", bool
+...             "Identify whether the movie {review} has a positive sentiment towards the movie", bool
 ...         ).alias("is_positive")
 ...     )
 ...     .aggregate(
@@ -75,11 +74,11 @@ Check if excessive violence is a frequent complaint for multiple movies:
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions a complaint towards the movie")
+...         prompt("The movie {review} contains a complaint towards the movie")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review}'s complaint is about excessive violence", bool
+...             "Identify whether the movie {review}'s complaint is about the movie's excessive violence", bool
 ...         ).alias("about_violence")
 ...     )
 ...     .aggregate(
@@ -93,16 +92,32 @@ Check if excessive violence is a frequent complaint for multiple movies:
 ... )
 ```
 
+Check if 10% of reviews praise the movie's sound effects:
+
+```
+>>> (
+...     df.map(
+...         prompt(
+...             "Identify whether the movie {review} praises the movie's sound effects", bool
+...         ).alias("praises_sound_effects")
+...     )
+...     .aggregate(
+...         [proportion(col("praises_sound_effects")).alias("praises_sound_effects_prop")]
+...     )
+...     .check(col("praises_sound_effects_prop").eq(0.10))
+... )
+```
+
 Check if Bob Smith wrote the soundtrack for the movie:
 
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions the writer of the movie's soundtrack")
+...         prompt("The movie {review} mentions the writer of the movie's soundtrack")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review} says that the writer of the movie's soundtrack is Bob Smith", bool
+...             "Identify whether the movie {review} says that the writer of the movie's soundtrack is Bob Smith", bool
 ...         ).alias("is_bob_smith")
 ...     )
 ...     .aggregate(
@@ -112,7 +127,7 @@ Check if Bob Smith wrote the soundtrack for the movie:
 ... )
 ```
 
-Check if multiple movies received mixed reviews:
+Check if some movies received mixed reviews:
 
 ```
 >>> class Sentiment(Enum):
@@ -123,7 +138,7 @@ Check if multiple movies received mixed reviews:
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify the sentiment of the {review} as positive (mostly favorable), "
+...             "Identify the sentiment of the movie {review} towards the movie as positive (mostly favorable), "
 ...             "negative (mostly unfavorable), mixed (both favorable and unfavorable), "
 ...             "or neutral (neither)", Sentiment
 ...         ).alias("sentiment")
@@ -135,8 +150,8 @@ Check if multiple movies received mixed reviews:
 ...         ],
 ...         group_by=[col("movie_name")]
 ...     )
-...     .aggregate([count_if((col("positive_or_mixed_prop") >= 0.2) & (col("negative_or_mixed_prop") >= 0.2)).alias("mixed_count")])
-...     .check(col("mixed_count") >= 2)
+...     .aggregate([bool_or((col("positive_or_mixed_prop") >= 0.2) & (col("negative_or_mixed_prop") >= 0.2)).alias("some_mixed")])
+...     .check(col("some_mixed"))
 ... )
 ```
 
@@ -145,11 +160,11 @@ Check if Interstellar has the most highly rated soundtrack among all the movie r
 ```
 >>> (
 ...     df.filter(
-...         prompt("The {review} mentions the movie's soundtrack")
+...         prompt("The movie {review} mentions the movie's soundtrack")
 ...     )
 ...     .map(
 ...         prompt(
-...             "Identify whether the {review} praises the movie's soundtrack", bool
+...             "Identify whether the movie {review} praises the movie's soundtrack", bool
 ...         ).alias("praises_soundtrack")
 ...     )
 ...     .aggregate(
@@ -162,6 +177,25 @@ Check if Interstellar has the most highly rated soundtrack among all the movie r
 ... )
 ```
 
+Check if Coco has the second highest number of praises among all the movie reviews:
+
+```
+>>> (
+...     df.map(
+...         prompt(
+...             "Identify whether the movie {review} praises the movie", bool
+...         ).alias("praises_movie")
+...     )
+...     .aggregate(
+...         [count_if(col("praises_movie")).alias("praises_count")],
+...         group_by=[col("movie_name")]
+...     )
+...     .with_rank(col("praises_count"))
+...     .filter(col("movie_name").eq("Coco"))
+...     .check(col("rank").eq(2))
+... )
+```
+
 Check if none of the movie reviews complain about the visual effects
 (using negation normal form):
 
@@ -169,7 +203,7 @@ Check if none of the movie reviews complain about the visual effects
 >>> (
 ...     df.map(
 ...         prompt(
-...             "Identify whether the {review} complains about the visual effects", bool
+...             "Identify whether the movie {review} complains about the movie's visual effects", bool
 ...         ).alias("complains_about_vfx")
 ...     )
 ...     .aggregate([bool_and(~col("complains_about_vfx")).alias("all_no_complaints")])

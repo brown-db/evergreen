@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "name": "cardinal_proportional_claim_1",
+    "timestamp": "2026-06-15_19-24-13",
+    "claim": "There are 4 airline companies where over 15% of customer complaints are regarding flight delays.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "company_id",
+          "dtype": "str",
+          "description": "The unique identifier of the airline company."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Compare the customer support dialogs for the different airline companies. Highlight the commonalities and differences between the companies and integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this claim step by step.\n\n## Step 1: Logical Structure\n\nThe claim states: \"There are 4 airline companies where over 15% of customer complaints are regarding flight delays.\"\n\nFormally:\n- Let C be the set of airline companies\n- For each company c \u2208 C, let complaints(c) be the dialogs that contain customer complaints for company c\n- For each complaint dialog d, let about_delays(d) be true if the complaint is about flight delays\n- The claim asserts: |{c \u2208 C : proportion(about_delays, complaints(c)) > 0.15}| = 4\n\n## Step 2: Query Operators and Expressions\n\n1. First, I need to filter to dialogs that contain customer complaints (since the claim is about \"customer complaints\").\n2. Then, I need to map each complaint dialog to whether it's about flight delays.\n3. Then, aggregate by company to get the proportion of complaints about flight delays per company.\n4. Then, count how many companies have that proportion > 0.15.\n5. Finally, check that the count equals 4.\n\nKey considerations:\n- The `filter()` should identify dialogs that are customer complaints.\n- The `map()` should identify whether the complaint is about flight delays.\n- Group by `company_id` to get per-company proportions.\n- Count companies where proportion > 0.15.\n\n## Step 3: Query\n\n```python\n(\n    df.filter(\n        prompt(\"The customer support {dialog} contains a customer complaint\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the customer complaint in the customer support {dialog} is regarding flight delays\",\n            bool\n        ).alias(\"about_flight_delays\")\n    )\n    .aggregate(\n        [proportion(col(\"about_flight_delays\")).alias(\"delay_complaint_prop\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [count_if(col(\"delay_complaint_prop\") > 0.15).alias(\"num_companies\")]\n    )\n    .check(col(\"num_companies\").eq(4))\n)\n```",
+    "query": "(\n    df.filter(\n        prompt(\"The customer support {dialog} contains a customer complaint\")\n    )\n    .map(\n        prompt(\n            \"Identify whether the customer complaint in the customer support {dialog} is regarding flight delays\",\n            bool\n        ).alias(\"about_flight_delays\")\n    )\n    .aggregate(\n        [proportion(col(\"about_flight_delays\")).alias(\"delay_complaint_prop\")],\n        group_by=[col(\"company_id\")]\n    )\n    .aggregate(\n        [count_if(col(\"delay_complaint_prop\") > 0.15).alias(\"num_companies\")]\n    )\n    .check(col(\"num_companies\").eq(4))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 8063,
+        "output_token_count": 503,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.119817204773426
+  }
+}

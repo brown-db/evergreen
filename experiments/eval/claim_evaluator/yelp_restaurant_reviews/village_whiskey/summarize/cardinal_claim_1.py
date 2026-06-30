@@ -1,17 +1,30 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, count_if, prompt
+from evergreen.planner.logical.expr import col, count_if, prompt
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class CardinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    NAME = "cardinal_claim_1"
+    CLAIM = (
+        "More than a handful of vegetarian customers enjoyed the restaurant's "
+        "burgers."
+    )
+    HINTS = "The phrase 'more than a handful' suggests a threshold of greater than 5."
+    SCHEMA = REVIEW_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
+    )
+
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -19,25 +32,12 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
         trial_id: int,
     ) -> DataFrame:
         return (
-            df.log(
-                str(
-                    self._checkpoint_df_path(
-                        CheckpointType.PRE_SEM_OP, impl, language_models, trial_id
-                    )
-                )
-            )
-            .filter(
+            df.map(
                 prompt(
-                    "The {text} indicates that the reviewer is a vegetarian or "
-                    "identifies as vegetarian"
-                )
-            )
-            .map(
-                prompt(
-                    "Identify whether the {text} indicates that the reviewer enjoyed "
-                    "the restaurant's burgers",
+                    "Identify whether the restaurant review {text} is from a "
+                    "vegetarian reviewer who enjoyed the restaurant's burgers",
                     bool,
-                ).alias("enjoyed_burgers")
+                ).alias("vegetarian_enjoyed_burgers")
             )
             .log(
                 str(
@@ -47,37 +47,15 @@ class CardinalClaim1Evaluator(ClaimEvaluator):
                 )
             )
             .aggregate(
-                [count_if(col("enjoyed_burgers")).alias("vegetarian_burger_enjoyers")]
+                [
+                    count_if(col("vegetarian_enjoyed_burgers")).alias(
+                        "vegetarian_burger_enjoyers"
+                    )
+                ]
             )
             .check(col("vegetarian_burger_enjoyers") > 5)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("vegetarian_burger_enjoyers") > 5
-
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("enjoyed_burgers"),)
-
-    def hints(self) -> str:
-        return (
-            "The phrase 'more than a handful' suggests a threshold of greater than 5."
-        )
-
-    def filter_prompt_str(self) -> str | None:
-        return (
-            "The {text} indicates that the reviewer is a vegetarian or "
-            "identifies as vegetarian"
-        )
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = CardinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/village_whiskey/summarize/cardinal_claim_1_2026-02-16_11-46-50.json"
-        ),
-        dataset_key=("review_id",),
-        text_field_name="text",
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    CardinalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

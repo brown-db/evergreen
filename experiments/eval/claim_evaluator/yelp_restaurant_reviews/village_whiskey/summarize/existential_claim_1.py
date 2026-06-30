@@ -1,17 +1,26 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, bool_or, col, prompt
+from evergreen.planner.logical.expr import bool_or, col, prompt
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_SCHEMA
 
 
 class ExistentialClaim1Evaluator(ClaimEvaluator):
-    def query(
+    NAME = "existential_claim_1"
+    CLAIM = "Some reviewers enjoyed the restaurant's calamari."
+    SCHEMA = REVIEW_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/village_whiskey/summarize_2026-02-10_17-32-55.json"
+    )
+
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -21,10 +30,10 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} expresses enjoyment of the "
-                    "restaurant's bacon fries",
+                    "Identify whether the restaurant review {text} expresses "
+                    "enjoyment of the restaurant's calamari",
                     bool,
-                ).alias("enjoys_bacon_fries")
+                ).alias("enjoys_calamari")
             )
             .log(
                 str(
@@ -33,30 +42,10 @@ class ExistentialClaim1Evaluator(ClaimEvaluator):
                     )
                 )
             )
-            .aggregate(
-                [bool_or(col("enjoys_bacon_fries")).alias("some_enjoy_bacon_fries")]
-            )
-            .check(col("some_enjoy_bacon_fries"))
+            .aggregate([bool_or(col("enjoys_calamari")).alias("some_enjoy_calamari")])
+            .check(col("some_enjoy_calamari"))
         )
-
-    def check_predicate(self) -> Expr:
-        return col("some_enjoy_bacon_fries")
-
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("enjoys_bacon_fries"),)
-
-    def hints(self) -> str:
-        return ""
 
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ExistentialClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/village_whiskey/summarize/existential_claim_1_2026-02-16_14-46-14.json"
-        ),
-        dataset_key=("review_id",),
-        text_field_name="text",
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ExistentialClaim1Evaluator().evaluate(parse_claim_evaluator_args())

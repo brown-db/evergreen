@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 import pickle
 import random
+import sys
 from abc import ABC, abstractmethod
 from collections import Counter, deque
 from itertools import groupby
+from pathlib import Path
 from typing import Protocol, cast
 
 import numpy as np
@@ -140,11 +142,18 @@ class BatchedPhysicalPlan(PhysicalPlan, ABC):
         self._input.open()
 
     def next(self) -> Row | None:
-        while not self._buffer:
-            if self._input_exhausted:
-                return None
-            self._buffer = deque(self._process_batch())
-        return self._buffer.popleft()
+        while True:
+            while not self._buffer:
+                if self._input_exhausted:
+                    return None
+                self._buffer = deque(self._process_batch())
+            row = self._buffer.popleft()
+            # A skip predicate (e.g., a downstream group that early-stopped) may
+            # have become active after this row was buffered. Re-check at emit
+            # time so buffered rows of a now-skipped group are dropped instead of
+            # being delivered and mistaken for a new group.
+            if not self.should_skip(row, self.schema()):
+                return row
 
     def close(self) -> None:
         self._input.close()
@@ -327,13 +336,15 @@ class FusedFilterProjection(BatchedPhysicalPlan):
             )
 
     @staticmethod
-    def _merge_field_indices(prompts: list[Prompt]) -> tuple[tuple[str, int], ...]:
-        field_indices: list[tuple[str, int]] = []
+    def _merge_field_indices(
+        prompts: list[Prompt],
+    ) -> tuple[tuple[str, int, str | None], ...]:
+        field_indices: list[tuple[str, int, str | None]] = []
         seen: set[str] = set()
         for prompt in prompts:
-            for field_name, index in prompt.field_indices():
+            for field_name, index, description in prompt.field_indices():
                 if field_name not in seen:
-                    field_indices.append((field_name, index))
+                    field_indices.append((field_name, index, description))
                     seen.add(field_name)
         return tuple(field_indices)
 
@@ -630,6 +641,13 @@ class StreamAggregate(PhysicalPlan):
 
             accumulator_confidence_level = 1 - adjusted_alpha
 
+            # The alpha-spending budget can underflow (e.g., geometric decay with
+            # many groups), so 1 - adjusted_alpha rounds to 1.0 (alpha == 0). A
+            # confidence sequence is undefined there, so fall back to the existing
+            # "deterministic-only" mode instead of running a degenerate CS.
+            if accumulator_confidence_level >= 1.0:
+                accumulator_confidence_level = None
+
             logger.debug(
                 "aggregate confidence level allocation: "
                 "agg_exprs=[%s], "
@@ -637,7 +655,7 @@ class StreamAggregate(PhysicalPlan):
                 "confidence_level=%f, "
                 "num_agg_exprs_supporting_estimation=%d, "
                 "group_count=%d, "
-                "accumulator_confidence_level=%f",
+                "accumulator_confidence_level=%s",
                 ", ".join(str(expr) for expr in self._agg_exprs),
                 ", ".join(str(expr) for expr in self._group_exprs),
                 self._confidence_level,
@@ -1127,7 +1145,7 @@ class Shuffle(PhysicalPlan):
 
 
 class Log(PhysicalPlan):
-    def __init__(self, path: str, input: PhysicalPlan, schema: Schema) -> None:
+    def __init__(self, path: Path, input: PhysicalPlan, schema: Schema) -> None:
         super().__init__()
         self._path = path
         self._input = input
@@ -1153,7 +1171,13 @@ class Log(PhysicalPlan):
         return None
 
     def close(self) -> None:
-        with open(self._path, "wb") as f:
-            pickle.dump((self._rows, self._schema), f)
-        logger.debug("Logged %d rows to %s", len(self._rows), self._path)
+        # Only persist a checkpoint on a clean run. When an exception or Ctrl-C
+        # (KeyboardInterrupt) propagates through the caller's `finally`,
+        # `sys.exc_info()` reports it here, so we skip writing a truncated
+        # checkpoint that a later run would mistake for complete results.
+        if sys.exc_info()[0] is None:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._path, "wb") as f:
+                pickle.dump((self._rows, self._schema), f)
+            logger.debug("Logged %d rows to %s", len(self._rows), self._path)
         self._input.close()

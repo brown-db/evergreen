@@ -530,39 +530,6 @@ class Not(PhysicalExpr):
                 )
 
 
-class Contains(PhysicalExpr):
-    def __init__(self, expr: PhysicalExpr, pattern: str, case_sensitive: bool) -> None:
-        self._expr = expr
-        self._pattern = pattern
-        self._case_sensitive = case_sensitive
-
-    def __str__(self) -> str:
-        return f"contains({self._expr}, {self._pattern!r}, {self._case_sensitive})"
-
-    def to_logical(self) -> logi_expr.Expr:
-        return logi_expr.Contains(
-            self._expr.to_logical(), self._pattern, self._case_sensitive
-        )
-
-    def evaluate(self, row: Row, row_id: RowId) -> AnnotatedValue:
-        annotated_value = self._expr.evaluate(row, row_id)
-
-        if not isinstance(annotated_value.value, str):
-            raise ValueError(f"Unexpected type: {type(annotated_value.value)}")
-
-        if self._case_sensitive:
-            value = self._pattern in annotated_value.value
-        else:
-            value = self._pattern.lower() in annotated_value.value.lower()
-
-        if value:
-            prov = Prov.pos_token(row_id, self.to_logical())
-        else:
-            prov = Prov.neg_token(row_id, self.to_logical())
-
-        return AnnotatedValue(value, prov)
-
-
 PROMPT_TEMPLATE = """<instructions>
 {instructions}
 </instructions>
@@ -582,7 +549,7 @@ class Prompt(PhysicalExpr):
         self,
         prompt_str: str,
         return_type: type[object],
-        field_indices: tuple[tuple[str, int], ...],
+        field_indices: tuple[tuple[str, int, str | None], ...],
         model: LanguageModel,
     ) -> None:
         self._prompt_str = prompt_str
@@ -602,7 +569,7 @@ class Prompt(PhysicalExpr):
     def return_type(self) -> type[object]:
         return self._return_type
 
-    def field_indices(self) -> tuple[tuple[str, int], ...]:
+    def field_indices(self) -> tuple[tuple[str, int, str | None], ...]:
         return self._field_indices
 
     def model(self) -> LanguageModel:
@@ -646,15 +613,17 @@ class Prompt(PhysicalExpr):
 
     @staticmethod
     def create_field_values_str(
-        row: Row, field_indices: tuple[tuple[str, int], ...]
+        row: Row, field_indices: tuple[tuple[str, int, str | None], ...]
     ) -> str:
-        field_values = tuple(
-            (field_name, row[index]) for field_name, index in field_indices
-        )
-        return "\n".join(
-            f"<{field_name}>\n{value}\n</{field_name}>"
-            for field_name, value in field_values
-        )
+        blocks: list[str] = []
+        for field_name, index, description in field_indices:
+            open_tag = (
+                f'<{field_name} description="{description}">'
+                if description
+                else f"<{field_name}>"
+            )
+            blocks.append(f"{open_tag}\n{row[index]}\n</{field_name}>")
+        return "\n".join(blocks)
 
 
 FUSED_INSTRUCTIONS = """
@@ -705,7 +674,7 @@ class FusedPrompt(FusedPhysicalExprs):
         self,
         prompt_strs: tuple[str, ...],
         return_types: tuple[type[object], ...],
-        field_indices: tuple[tuple[str, int], ...],
+        field_indices: tuple[tuple[str, int, str | None], ...],
         model: LanguageModel,
     ):
         self._prompt_strs = prompt_strs

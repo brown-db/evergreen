@@ -384,16 +384,22 @@ class EnsembleLanguageModel(LanguageModel):
         voted_responses: list[T] = []
 
         for i in range(len(prompt_strs)):
-            votes = [responses[m][i] for m in range(len(self._models))]
-            counter = Counter(votes)
+            per_model_votes = {
+                model._model_name: responses[m][i]
+                for m, model in enumerate(self._models)
+            }
+            counter = Counter(per_model_votes.values())
             winner = counter.most_common(1)[0][0]
 
             logger.debug(
-                "%s majority vote for prompt %d: %s (votes: %s)",
+                "%s prompt (%d / %d) majority vote: winner=%s, tally=%s, "
+                "per_model_votes=%s",
                 self._model_name,
-                i,
+                i + 1,
+                len(prompt_strs),
                 winner,
                 dict(counter),
+                per_model_votes,
             )
 
             voted_responses.append(winner)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from evergreen.catalog.schema import Field, Schema
 from evergreen.catalog.table import TableProvider
@@ -27,6 +29,12 @@ class LogicalPlan(ABC):
     @abstractmethod
     def schema(self) -> Schema:
         pass
+
+    def walk(self) -> Iterator[LogicalPlan]:
+        """Pre-order traversal of this plan and all of its descendants."""
+        yield self
+        for input in self.inputs():
+            yield from input.walk()
 
     def is_above(self, plan_type: type[LogicalPlan]) -> bool:
         return any(
@@ -356,11 +364,11 @@ class Log(LogicalPlan):
     but before the aggregation.
     """
 
-    path: str
+    path: Path
     input: LogicalPlan
 
     def __repr__(self) -> str:
-        return f"log(path={self.path!r})"
+        return f"log(path={str(self.path)!r})"
 
     def with_inputs(self, inputs: tuple[LogicalPlan, ...]) -> LogicalPlan:
         assert len(inputs) == 1

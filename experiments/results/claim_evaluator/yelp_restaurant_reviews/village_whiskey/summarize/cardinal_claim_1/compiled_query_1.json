@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "cardinal_claim_1",
+    "timestamp": "2026-06-15_19-41-15",
+    "claim": "More than a handful of vegetarian customers enjoyed the restaurant's burgers.",
+    "hints": "The phrase 'more than a handful' suggests a threshold of greater than 5.",
+    "schema": {
+      "fields": [
+        {
+          "name": "review_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer review."
+        },
+        {
+          "name": "text",
+          "dtype": "str",
+          "description": "The customer review text."
+        }
+      ],
+      "key": [
+        "review_id"
+      ]
+    },
+    "agg_prompt": "Summarize the reviews for Village Whiskey."
+  },
+  "claim_compilation_result": {
+    "response": "I need to verify the claim that \"More than a handful of vegetarian customers enjoyed the restaurant's burgers.\"\n\n## Step 1: Logical Structure\n\nThe claim states that the count of reviews where a vegetarian customer enjoyed the restaurant's burgers is greater than 5 (based on the hint that \"more than a handful\" means > 5).\n\nFormally:\n- Let P(x) = \"review x is from a vegetarian customer who enjoyed the restaurant's burgers\"\n- Claim: count({x | P(x)}) > 5\n\n## Step 2: Query Operators and Expressions\n\n- I need to identify reviews where a vegetarian customer enjoyed the burgers. This is a semantic feature that combines two conditions: (1) the reviewer is vegetarian, and (2) they enjoyed the burgers. I should use `map(prompt(..., bool))` to label this as a single boolean column.\n- Then I aggregate with `count_if()` to count how many such reviews exist.\n- Finally, I check if the count is greater than 5.\n\nSince both conditions (being vegetarian AND enjoying the burgers) need to be satisfied together, I'll fold them into a single `map(prompt(..., bool))`.\n\n## Step 3: Output the query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the review {text} is from a vegetarian customer who enjoyed the restaurant's burgers\",\n            bool\n        ).alias(\"vegetarian_enjoyed_burgers\")\n    )\n    .aggregate(\n        [count_if(col(\"vegetarian_enjoyed_burgers\")).alias(\"count_vegetarian_enjoyed\")]\n    )\n    .check(col(\"count_vegetarian_enjoyed\") > 5)\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the review {text} is from a vegetarian customer who enjoyed the restaurant's burgers\",\n            bool\n        ).alias(\"vegetarian_enjoyed_burgers\")\n    )\n    .aggregate(\n        [count_if(col(\"vegetarian_enjoyed_burgers\")).alias(\"count_vegetarian_enjoyed\")]\n    )\n    .check(col(\"count_vegetarian_enjoyed\") > 5)\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 8039,
+        "output_token_count": 398,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 8.71735158469528
+  }
+}

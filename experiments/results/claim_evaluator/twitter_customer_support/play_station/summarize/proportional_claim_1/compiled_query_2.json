@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "proportional_claim_1",
+    "timestamp": "2026-06-15_19-30-25",
+    "claim": "10% of customers are experiencing problems with payments or billing.",
+    "hints": "",
+    "schema": {
+      "fields": [
+        {
+          "name": "dialog_id",
+          "dtype": "str",
+          "description": "The unique identifier of the customer support dialog."
+        },
+        {
+          "name": "dialog",
+          "dtype": "str",
+          "description": "The customer support dialog."
+        }
+      ],
+      "key": [
+        "dialog_id"
+      ]
+    },
+    "agg_prompt": "Summarize the customer issues and problematic agent responses in customer support dialogs for PlayStation. Integrate counts and statistics in your analysis where relevant."
+  },
+  "claim_compilation_result": {
+    "response": "I'll analyze this step by step.\n\n## Step 1: Logical Structure of the Claim\n\nThe claim states: \"10% of customers are experiencing problems with payments or billing.\"\n\nLogical structure:\n- Population: All customer support dialogs (each dialog represents a customer)\n- Predicate: The customer is experiencing problems with payments or billing\n- Quantifier: The proportion of customers satisfying the predicate equals 10% (0.10)\n\nFormally: proportion({d | d is a dialog \u2227 customer_issue_is_payments_or_billing(d)}) \u2248 0.10\n\n## Step 2: Query Operators and Expressions\n\n- Since the claim is about the proportion of customers experiencing payment/billing problems, I need to:\n  1. Use `map()` with a `prompt()` to label each dialog as whether the customer's issue is about payments or billing\n  2. Use `aggregate()` with `proportion()` to compute the proportion\n  3. Use `check()` to verify the proportion equals 0.10\n\n- The dataset is already scoped to PlayStation customer support dialogs, so no additional filtering is needed.\n- Each tuple represents a customer support dialog, so I'll frame the prompt as identifying whether the customer's issue in that dialog is about payments or billing.\n\n## Step 3: Semantic Verification Query\n\n```python\n(\n    df.map(\n        prompt(\n            \"Identify whether the customer support dialog {dialog} involves the customer experiencing problems with payments or billing\",\n            bool\n        ).alias(\"is_payment_or_billing\")\n    )\n    .aggregate(\n        [proportion(col(\"is_payment_or_billing\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").eq(0.10))\n)\n```",
+    "query": "(\n    df.map(\n        prompt(\n            \"Identify whether the customer support dialog {dialog} involves the customer experiencing problems with payments or billing\",\n            bool\n        ).alias(\"is_payment_or_billing\")\n    )\n    .aggregate(\n        [proportion(col(\"is_payment_or_billing\")).alias(\"payment_billing_prop\")]\n    )\n    .check(col(\"payment_billing_prop\").eq(0.10))\n)",
+    "language_model_metrics": [
+      {
+        "model_name": "claude-opus-4-6",
+        "prompt_count": 1,
+        "prompt_cache_hit_count": 0,
+        "input_token_count": 8037,
+        "output_token_count": 416,
+        "cache_creation_input_token_count": 0,
+        "cache_read_input_token_count": 0
+      }
+    ],
+    "latency": 9.598412213847041
+  }
+}

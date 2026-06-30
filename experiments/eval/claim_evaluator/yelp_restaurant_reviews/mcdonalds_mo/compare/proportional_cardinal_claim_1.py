@@ -1,17 +1,29 @@
 from pathlib import Path
 
 from evergreen.data_frame import DataFrame
-from evergreen.planner.logical.expr import Expr, col, count_if, prompt, proportion
+from evergreen.planner.logical.expr import col, count_if, prompt, proportion
 from experiments.claim_evaluator import (
     CheckpointType,
     ClaimEvaluator,
     Implementation,
     parse_claim_evaluator_args,
 )
+from experiments.schemas import REVIEW_WITH_BUSINESS_SCHEMA
 
 
 class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
-    def query(
+    NAME = "proportional_cardinal_claim_1"
+    CLAIM = (
+        "Only a minority of McDonald's locations had multiple reports of "
+        "incorrect orders."
+    )
+    SCHEMA = REVIEW_WITH_BUSINESS_SCHEMA
+    TEXT_FIELD_NAME = "text"
+    AGG_RESULT_PATH = Path(
+        "experiments/results/semantic_aggregate/yelp_restaurant_reviews/mcdonalds_mo/compare_2026-02-10_19-11-51.json"
+    )
+
+    def reference_query(
         self,
         df: DataFrame,
         impl: Implementation,
@@ -21,10 +33,10 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
         return (
             df.map(
                 prompt(
-                    "Identify whether the {text} mentions an incorrect order (e.g., "
-                    "wrong items, missing items, order mistakes)",
+                    "Identify whether the restaurant review {text} reports an "
+                    "incorrect order",
                     bool,
-                ).alias("mentions_incorrect_order")
+                ).alias("reports_incorrect_order")
             )
             .log(
                 str(
@@ -35,7 +47,7 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
             )
             .aggregate(
                 [
-                    count_if(col("mentions_incorrect_order")).alias(
+                    count_if(col("reports_incorrect_order")).alias(
                         "incorrect_order_count"
                     )
                 ],
@@ -51,24 +63,6 @@ class ProportionalCardinalClaim1Evaluator(ClaimEvaluator):
             .check(col("prop_with_multiple_incorrect") < 0.5)
         )
 
-    def check_predicate(self) -> Expr:
-        return col("prop_with_multiple_incorrect") < 0.5
-
-    def semantic_map_columns(self) -> tuple[Expr, ...]:
-        return (col("mentions_incorrect_order"),)
-
-    def hints(self) -> str:
-        return ""
-
 
 if __name__ == "__main__":
-    args = parse_claim_evaluator_args()
-    claim_evaluator = ProportionalCardinalClaim1Evaluator(
-        claim_compilation_result_path=Path(
-            "experiments/results/claim_compiler/yelp_restaurant_reviews/mcdonalds_mo/compare/proportional_cardinal_claim_1_2026-02-18_01-06-14.json"
-        ),
-        dataset_key=("review_id",),
-        text_field_name="text",
-        random_seed=42,
-    )
-    claim_evaluator.evaluate(args)
+    ProportionalCardinalClaim1Evaluator().evaluate(parse_claim_evaluator_args())

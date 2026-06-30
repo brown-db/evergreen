@@ -2,7 +2,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import httpx
 import numpy as np
@@ -18,6 +18,7 @@ from anthropic.types import (
 from pydantic import BaseModel, Field, create_model
 
 from evergreen.catalog.schema import Field as SchemaField
+from evergreen.catalog.schema import Schema
 from evergreen.common.constants import CACHE_DIR_ROOT, EMBEDDING_FIELD_SUFFIX
 from evergreen.core.session_context import SessionContext
 from evergreen.data_frame import QueryMetrics
@@ -39,40 +40,39 @@ class RetrievalEngine:
     def __init__(
         self,
         dataset_path: str,
-        dataset_key: tuple[str, ...],
+        schema: Schema,
         text_field_name: str,
-        schema_field_names: set[str],
         embedding_model: EmbeddingModel,
     ) -> None:
         df = SessionContext().read_json(
             dataset_path,
-            dataset_key,
+            schema.key,
         )
 
-        self._schema = df.schema()
-        self._schema_field_names = schema_field_names
+        self._dataset_schema = df.schema()
+        self._claim_schema = schema
 
-        text_field_index = self._schema.index_of(text_field_name)
-        embedding_index = self._schema.index_of(
+        text_field_index = self._dataset_schema.index_of(text_field_name)
+        embedding_index = self._dataset_schema.index_of(
             text_field_name + EMBEDDING_FIELD_SUFFIX
         )
         field_indices = {
-            name: self._schema.index_of(name) for name in self._schema_field_names
+            name: self._dataset_schema.index_of(name)
+            for name in self._claim_schema.field_names()
         }
 
         doc_embeddings: list[list[float]] = []
 
         self._docs: list[str] = []
-        self._row_strs: list[str] = []
         self._rows: list[dict[str, object]] = []
 
         for row in df.collect().rows:
             doc_embeddings.append(cast(list[float], row[embedding_index]))
             filtered_obj = {
-                name: row[field_indices[name]] for name in self._schema_field_names
+                name: row[field_indices[name]]
+                for name in self._claim_schema.field_names()
             }
             self._docs.append(str(row[text_field_index]))
-            self._row_strs.append(json.dumps(filtered_obj))
             self._rows.append(filtered_obj)
 
         self._doc_embeddings = np.array(doc_embeddings)
@@ -81,14 +81,14 @@ class RetrievalEngine:
 
     @property
     def row_count(self) -> int:
-        return len(self._row_strs)
+        return len(self._rows)
 
     @property
     def schema_fields(self) -> tuple[SchemaField, ...]:
         return tuple(
             field
-            for field in self._schema.fields
-            if field.name in self._schema_field_names
+            for field in self._dataset_schema.fields
+            if field.name in self._claim_schema.field_names()
         )
 
     def retrieve(
@@ -98,7 +98,32 @@ class RetrievalEngine:
         exclusion_keywords: list[str],
         filters: dict[str, object],
         k: int,
-    ) -> list[str]:
+    ) -> list[dict[str, object]]:
+        """Search the dataset and return the top-k most relevant rows, ranked by
+        semantic similarity (query_text) and keyword matching
+        (inclusion/exclusion_keywords) using Reciprocal Rank Fusion.
+
+        Args:
+            query_text: Semantic search query used to find relevant rows via embedding
+                similarity. Choose a query that captures the meaning of the evidence
+                you need.
+            inclusion_keywords: Keywords/phrases that boost ranking of rows
+                containing them (soft signal, not a hard filter). Matched as
+                case-insensitive substrings, so prefer shorter, atomic terms.
+                Include common variations and abbreviations.
+            exclusion_keywords: Keywords/phrases that penalize ranking of rows
+                containing them (soft signal, not a hard filter). Matched as
+                case-insensitive substrings, so prefer shorter, atomic terms.
+            filters: Hard equality filters on non-text fields. Only rows matching all
+                filters are returned. E.g., filters={"id": "123"}.
+            k: Number of rows to retrieve. Can be up to the total row count for
+                exhaustive search.
+
+        Returns:
+            A list of up to k rows, each a dict of field name to value, ordered from
+            most to least relevant.
+        """
+
         filters = {k: v for k, v in filters.items() if v is not None}
 
         if filters:
@@ -125,7 +150,7 @@ class RetrievalEngine:
             exclusion_keywords,
         )
 
-        return [self._row_strs[candidate_indices[i]] for i in sorted_indices[:k]]
+        return [self._rows[candidate_indices[i]] for i in sorted_indices[:k]]
 
 
 class RetrieveParams(BaseModel):
@@ -150,17 +175,22 @@ class RetrieveParams(BaseModel):
         description=(
             "Number of rows to retrieve. Can be up to the total "
             "row count for exhaustive search. Only the first "
-            "page_size rows are returned immediately; use "
-            "continue_reading to view the rest."
+            "page_size rows (max 50) are returned immediately; call "
+            "continue_reading repeatedly to view the rest."
         )
     )
-    page_size: int = Field(description="Number of retrieved rows to view immediately.")
+    page_size: Literal[10, 20, 30, 40, 50] = Field(
+        description="Number of retrieved rows to view immediately. "
+        "Must be one of 10, 20, 30, 40, 50 (max 50 per page); use "
+        "continue_reading to page through the rest."
+    )
 
 
 class ContinueReadingParams(BaseModel):
-    page_size: int = Field(
+    page_size: Literal[10, 20, 30, 40, 50] = Field(
         description="Number of rows to read next. Picks up from where "
-        "the last page ended. Calling retrieve again resets the cursor."
+        "the last page ended. Calling retrieve again resets the cursor. "
+        "Must be one of 10, 20, 30, 40, 50 (max 50 per page)."
     )
 
 
@@ -244,11 +274,16 @@ def _build_tools(
     ]
 
 
-def _format_page(rows: list[str], cursor: int, page_size: int) -> tuple[str, int]:
+def _format_page(
+    rows: list[dict[str, object]], cursor: int, page_size: int
+) -> tuple[str, int]:
     page = rows[cursor : cursor + page_size]
     new_cursor = cursor + len(page)
     remaining = len(rows) - new_cursor
-    text = "\n".join(page) + f"\n[ROWS_SHOWN={len(page)} ROWS_REMAINING={remaining}]"
+    text = (
+        "\n".join(json.dumps(row) for row in page)
+        + f"\n[ROWS_SHOWN={len(page)} ROWS_REMAINING={remaining}]"
+    )
     logger.debug("tool_result:\n%s", text)
     return text, new_cursor
 
@@ -276,27 +311,27 @@ def _add_cache_control(messages: list[MessageParam]) -> list[MessageParam]:
 
 
 _SYSTEM_PROMPT_TEMPLATE = """\
-You are a fact-checking agent. Your goal is to determine whether a claim is \
+You are a fact-checking agent. Your goal is to determine whether a claim is
 grounded in a dataset, i.e., fully supported by evidence in the dataset.
 A claim is NOT grounded if the dataset contradicts it or lacks sufficient evidence.
 
 ## Dataset
-- {row_count} total rows.
-- Fields per row: {field_names}.
-- Primary text field: `{text_field_name}`.
+- {row_count} total rows
+- Schema: {schema}
+- Primary text field: `{text_field_name}`
 
 ## Reasoning strategy
 At each step, think carefully about:
-1. **Claim formulation** — formally express the logical structure of the claim. \
-Leverage your knowledge of first-order logic and its extensions. Identify \
-constants, variables, predicates, functions, quantifiers, etc. If hints are \
-provided, use them for clarification on vague quantifier thresholds.
+1. **Claim formulation** — formally express the logical structure of the claim.
+Leverage your knowledge of first-order logic and its extensions. Identify
+constants, variables, predicates, functions, quantifiers, etc. If hints are
+provided, use them for clarification.
 2. **Progress review** — summarize what you have searched for and found so far.
 3. **Gap analysis** — identify what evidence is still missing.
 4. **Next action** — decide whether to retrieve, continue_reading, or respond.
 
-You are encouraged to set k to a large value (even to the total row count) for \
-exhaustive search and then paginate with continue_reading in order to gather \
+You are encouraged to set k to a large value (even to the total row count) for
+exhaustive search and then paginate with continue_reading in order to gather
 necessary evidence. Do not stop until you are absolutely confident in your verdict."""
 
 
@@ -305,9 +340,8 @@ def evaluate_claim(
     hints: str,
     agg_prompt: str,
     dataset_path: str,
-    dataset_key: tuple[str, ...],
+    schema: Schema,
     text_field_name: str,
-    schema_field_names: set[str],
     language_model: str,
 ) -> EvaluationResult:
     conn = load_snowflake_connection(CONNECTION_NAME)
@@ -316,6 +350,7 @@ def evaluate_claim(
         base_url=f"https://{conn['account']}.snowflakecomputing.com/api/v2/cortex",
         http_client=httpx.Client(headers={"Authorization": f"Bearer {pat}"}),
         default_headers={"Authorization": f"Bearer {pat}"},
+        max_retries=10,
     )
 
     model_config = CortexModelConfig(
@@ -328,9 +363,8 @@ def evaluate_claim(
     )
     retrieval_engine = RetrievalEngine(
         dataset_path,
-        dataset_key,
+        schema,
         text_field_name,
-        schema_field_names,
         embedding_model,
     )
 
@@ -338,7 +372,7 @@ def evaluate_claim(
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
         row_count=retrieval_engine.row_count,
-        field_names=", ".join(f"`{name}`" for name in sorted(schema_field_names)),
+        schema=schema,
         text_field_name=text_field_name,
     )
 
@@ -376,7 +410,7 @@ def evaluate_claim(
     )
 
     outputs: list[dict[str, object]] = []
-    retrieved_rows: list[str] = []
+    retrieved_rows: list[dict[str, object]] = []
     cursor = 0
     step = 0
     total_input_tokens = 0

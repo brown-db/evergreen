@@ -311,16 +311,14 @@ class PhysicalPlanner:
                 return phys_expr.Not(
                     cls.create_expr(expr, input_schema, session_state),
                 )
-            case logi_expr.Contains(expr, pattern, case_sensitive):
-                return phys_expr.Contains(
-                    cls.create_expr(expr, input_schema, session_state),
-                    pattern,
-                    case_sensitive,
-                )
             case logi_expr.Prompt(prompt_str, return_type):
                 field_names = re.findall(FIELD_NAME_REGEX, prompt_str)
                 field_indices = tuple(
-                    (field_name, input_schema.index_of(field_name))
+                    (
+                        field_name,
+                        index := input_schema.index_of(field_name),
+                        input_schema.fields[index].description,
+                    )
                     for field_name in field_names
                 )
                 return phys_expr.Prompt(

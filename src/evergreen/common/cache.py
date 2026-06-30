@@ -33,7 +33,6 @@ class FileCache(Cache):
 
     def __init__(self, cache_dir: Path):
         self._cache_dir = cache_dir
-        cache_dir.mkdir(parents=True, exist_ok=True)
 
     def __contains__(self, key: str) -> bool:
         return (self._cache_dir / key).exists()
@@ -46,6 +45,7 @@ class FileCache(Cache):
 
     def __setitem__(self, key: str, value: object) -> None:
         path = self._cache_dir / key
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(dir=self._cache_dir)
         try:
             with os.fdopen(fd, "wb") as f:
@@ -57,4 +57,6 @@ class FileCache(Cache):
             raise
 
     def __len__(self) -> int:
+        if not self._cache_dir.exists():
+            return 0
         return sum(1 for _ in self._cache_dir.iterdir())
