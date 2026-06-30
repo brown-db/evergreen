@@ -22,7 +22,6 @@ class TestCortexLanguageModel:
                 "gemini-3.5-flash",
                 "qwen3-vl-235b-a22b",
                 "qwen3-next-80b-a3b",
-                "llama3.1-8b",
             ],
         ],
     )

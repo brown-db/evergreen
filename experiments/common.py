@@ -11,9 +11,6 @@ EVALUATION_LANGUAGE_MODELS = (
     "claude-haiku-4-5",
     "qwen3-vl-235b-a22b",
     "qwen3-next-80b-a3b",
-    "llama4-maverick",
-    "llama4-scout",
-    "llama3.1-8b",
 )
 
 ENSEMBLE_LANGUAGE_MODELS = ("claude-opus-4-8", "openai-gpt-5.5", "gemini-3.5-flash")
@@ -24,9 +21,6 @@ MODEL_CONTEXT_WINDOW_TOKENS = {
     "claude-sonnet-4-6": 200_000,
     "claude-sonnet-4-5": 200_000,
     "claude-haiku-4-5": 200_000,
-    "llama4-maverick": 128_000,
-    "llama4-scout": 128_000,
-    "llama3.1-8b": 128_000,
 }
 
 # Input and output prices per million tokens for each language model
@@ -59,10 +53,6 @@ MODEL_PRICING = {
     # source: https://www.alibabacloud.com/help/en/model-studio/model-pricing
     "qwen3-vl-235b-a22b": {"input": 0.287, "output": 1.147},
     "qwen3-next-80b-a3b": {"input": 0.144, "output": 0.574},
-    # source: https://groq.com/pricing
-    "llama4-maverick": {"input": 0.20, "output": 0.60},
-    "llama4-scout": {"input": 0.11, "output": 0.34},
-    "llama3.1-8b": {"input": 0.05, "output": 0.08},
 }
 
 EMBEDDING_MODEL = "snowflake-arctic-embed-l-v2.0"

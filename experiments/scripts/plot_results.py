@@ -149,9 +149,6 @@ _MODEL_LABELS = {
     "claude-haiku-4-5": "Haiku 4.5",
     "qwen3-vl-235b-a22b": "Qwen3-VL",
     "qwen3-next-80b-a3b": "Qwen3-Next",
-    "llama4-maverick": "Maverick",
-    "llama4-scout": "Scout",
-    "llama3.1-8b": "8B",
 }
 
 # LaTeX row macros for the results tables. The ``*_ref_query`` runs supply the
