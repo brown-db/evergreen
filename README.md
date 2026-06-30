@@ -2,6 +2,20 @@
 
 This repository contains the code and experiments for [*Evergreen: Efficient Claim Verification for Semantic Aggregates*](https://arxiv.org/abs/2604.26180).
 
+## Repository Layout
+
+```text
+src/evergreen/     # The Evergreen system (compiler, optimizer, provenance)
+tests/             # Unit and integration tests
+docs/              # API reference (built into site/llms-full.txt)
+experiments/       # Benchmark, baselines, evaluation harness, and results
+  eval/semantic_aggregate/    # Aggregation queries (AI_AGG) that produce the aggregates
+  eval/claim_evaluator/       # The 32 benchmark claims as verification queries
+  results/semantic_aggregate/ # Raw aggregate outputs and decomposed claims
+  results/claim_evaluator/    # Per-claim results (cost, latency, verdict, provenance)
+  figures/                    # Plots and tables
+```
+
 ## Prerequisites
 
 - Python 3.12+
