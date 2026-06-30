@@ -1291,41 +1291,6 @@ def main() -> None:
     plot_verification_heatmap(df)
     plot_metric(
         df,
-        column="filter_precision",
-        ylabel="filter precision",
-        filename="filter_precision",
-        impls=REF_QUERY_IMPLEMENTATIONS,
-    )
-    plot_metric(
-        df,
-        column="filter_recall",
-        ylabel="filter recall",
-        filename="filter_recall",
-        impls=REF_QUERY_IMPLEMENTATIONS,
-    )
-    plot_metric(
-        df,
-        column="filter_f1",
-        ylabel="filter f1 score",
-        filename="filter_f1",
-        impls=REF_QUERY_IMPLEMENTATIONS,
-    )
-    plot_metric(
-        df,
-        column="map_accuracy",
-        ylabel="map accuracy",
-        filename="map_accuracy",
-        impls=REF_QUERY_IMPLEMENTATIONS,
-    )
-    plot_metric(
-        df,
-        column="provenance_precision",
-        ylabel="provenance precision",
-        filename="provenance_precision",
-        impls=REF_QUERY_IMPLEMENTATIONS,
-    )
-    plot_metric(
-        df,
         column="total_token_cost",
         ylabel="total token cost ($)",
         filename="total_token_cost",
