@@ -1250,6 +1250,7 @@ def main() -> None:
     # so these absolute point sizes render identically across every figure.
     plt.rcParams.update(
         {
+            "pdf.fonttype": 42,
             "font.size": 6,
             "axes.labelsize": 7,
             "xtick.labelsize": 6,
